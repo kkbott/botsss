@@ -30,11 +30,12 @@ import type {
   WaveGroup,
   WaveDef,
 } from './types';
-import { ART } from './models';
 import { AudioEngine, type SoundName } from './audio';
 import { FloatingTexts, ParticleSystem } from './effects';
 import { GameUI, type InspectorData, type UIActions } from './ui';
 import { World, type PlotVisual } from './world';
+import type { ArtProvider } from './art';
+import type { EnvironmentAssets } from './assets';
 
 interface PointerState {
   downX: number;
@@ -135,6 +136,7 @@ function timeText(seconds: number) {
 
 export class Game {
   private readonly world: World;
+  private readonly art: ArtProvider;
   private readonly audio: AudioEngine;
   private readonly ui: GameUI;
   private readonly particles: ParticleSystem;
@@ -194,9 +196,10 @@ export class Game {
   private pointer: PointerState | null = null;
   private lastPaintPlot = -1;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, art: ArtProvider, environment: EnvironmentAssets | null) {
     this.canvas = canvas;
-    this.world = new World(canvas);
+    this.art = art;
+    this.world = new World(canvas, environment);
     this.particles = new ParticleSystem(this.world.scene);
     this.floaters = new FloatingTexts(this.uiFloatingLayer());
     this.enemyBarLayer = this.getLayer('enemy-bar-layer');
@@ -213,7 +216,6 @@ export class Game {
     this.bindInput();
     this.bindKeyboard();
     this.bindVisibility();
-    this.ui.setLoading(0.92, '布置石台与农田');
     this.world.updateAmbient(0);
     this.world.render();
     this.phase = 'menu';
@@ -221,7 +223,7 @@ export class Game {
     this.ui.showMenu(this.save.bestWave, this.save.victories);
     requestAnimationFrame(() => {
       this.ui.setLoading(1, '准备就绪');
-      window.setTimeout(() => this.ui.hideLoading(), 220);
+      window.setTimeout(() => this.ui.hideLoading(), 180);
     });
     this.installDebugApi();
     this.lastTime = performance.now();
@@ -466,7 +468,7 @@ export class Game {
     if (!plot.crop) return;
     const view = this.viewFor(plot.spec.index);
     this.clearCropVisual(plot);
-    const art = ART.crop(plot.crop.type, stage, stage === 3);
+    const art = this.art.crop(plot.crop.type, stage, stage === 3);
     art.group.rotation.y = ((plot.spec.index * 2.399) % (Math.PI * 2)) + 0.4;
     art.group.scale.setScalar(0.92 + ((plot.spec.index * 7) % 5) * 0.018);
     view.cropAnchor.add(art.group);
@@ -705,7 +707,7 @@ export class Game {
     this.gold -= def.cost;
     this.star -= def.starCost;
     const levelDef = def.levels[0];
-    const art = ART.tower(type, 1);
+    const art = this.art.tower(type, 1);
     art.group.position.set(padSpec.x, 0.02, padSpec.z);
     art.group.rotation.y = padSpec.rotation;
     this.world.scene.add(art.group);
@@ -730,6 +732,7 @@ export class Game {
       investedStar: def.starCost,
     };
     this.towers.push(tower);
+    this.world.padVisuals[padIndex].marker.visible = false;
     this.stats.towersBuilt += 1;
     this.particles.burstBuild(new Vector3(padSpec.x, 0.35, padSpec.z));
     this.audio.play('build');
@@ -756,7 +759,7 @@ export class Game {
     this.star -= starCost;
     this.particles.burstBuild(new Vector3(tower.pad.x, 0.6, tower.pad.z));
     tower.group.removeFromParent();
-    const art = ART.tower(tower.id, nextLevel);
+    const art = this.art.tower(tower.id, nextLevel);
     art.group.position.set(tower.pad.x, 0.02, tower.pad.z);
     art.group.rotation.y = tower.pad.rotation;
     this.world.scene.add(art.group);
@@ -787,6 +790,7 @@ export class Game {
     this.star += starRefund;
     tower.group.removeFromParent();
     tower.rangeRing.removeFromParent();
+    this.world.padVisuals[tower.pad.index].marker.visible = true;
     this.towers = this.towers.filter((t) => t !== tower);
     this.clearTowerSelection();
     this.particles.spawn(new Vector3(tower.pad.x, 0.5, tower.pad.z), 0xd9c9a8, 10, {
@@ -906,7 +910,7 @@ export class Game {
 
   private spawnEnemy(id: EnemyId) {
     const def = ENEMIES[id];
-    const art = ART.enemy(id);
+    const art = this.art.enemy(id);
     const group = art.group;
     const pos = this.world.path.curve.getPointAt(0);
     group.position.set(pos.x, HERO_Y, pos.z);
@@ -915,6 +919,16 @@ export class Game {
     group.userData.legs = art.legs;
     group.userData.visual = art.visual;
     this.world.scene.add(group);
+    if (!def.boss) {
+      const aura = new Mesh(
+        new RingGeometry(0.25, 0.38, 20),
+        new MeshBasicMaterial({ color: def.tint, transparent: true, opacity: 0.34, side: DoubleSide, depthWrite: false }),
+      );
+      aura.rotation.x = -Math.PI / 2;
+      aura.position.y = 0.02;
+      aura.castShadow = false;
+      group.add(aura);
+    }
     const bar = document.createElement('div');
     bar.className = `enemy-bar${def.boss ? ' is-boss' : ''}`;
     const track = document.createElement('div');
@@ -933,7 +947,7 @@ export class Game {
       progress: 0,
       worldPos: new Vector3(pos.x, HERO_Y, pos.z),
       group,
-      mixer: null,
+      mixer: art.mixer,
       slowFactor: 0,
       slowTimer: 0,
       barEl: bar,
@@ -994,7 +1008,7 @@ export class Game {
       if (visual) {
         visual.position.y = Math.abs(Math.sin(phase)) * 0.035;
       }
-      if (enemy.mixer) enemy.mixer.update(dt * slow);
+      if (enemy.mixer) enemy.mixer.update(dt * slow * (0.85 + enemy.speed * 0.18));
       if (enemy.slowTimer > 0 && Math.random() < dt * 2) {
         this.particles.spawn(enemy.group.position.clone().add(new Vector3(0, 0.3, 0)), 0x8deee0, 1, {
           speed: 0.4,
@@ -1175,12 +1189,12 @@ export class Game {
     for (const tower of this.towers) {
       if (tower.cooldown > 0) tower.cooldown -= dt;
       const target = this.findTarget(tower);
+      const spin = tower.group.getObjectByName('tower-spin');
+      if (spin) spin.rotation.y += dt * 0.85;
       if (!target) continue;
       if (tower.cooldown <= 0) {
         tower.cooldown = tower.fireCooldown;
         this.fireTower(tower, target);
-        const spin = tower.group.getObjectByName('tower-spin');
-        if (spin) spin.rotation.z += 0.9;
         const orb = tower.group.getObjectByName('tower-orb') as Mesh | undefined;
         if (orb) {
           orb.scale.setScalar(1.6);
@@ -1768,7 +1782,10 @@ export class Game {
       view.matureGlow.visible = false;
       view.highlight.visible = false;
     }
-    for (const view of this.world.padVisuals) view.highlight.visible = false;
+    for (const view of this.world.padVisuals) {
+      view.highlight.visible = false;
+      view.marker.visible = true;
+    }
     this.selectedTower = null;
     this.ui.hideInspector();
     this.clearHover();
@@ -1780,7 +1797,8 @@ export class Game {
     if (!new URLSearchParams(window.location.search).has('debug')) return;
     const game = this;
     const api = {
-      version: '1.0.0-phase1',
+      version: '1.0.0',
+      art: game.art.kind,
       get ready() {
         return game.phase !== 'loading';
       },
@@ -1908,6 +1926,12 @@ export class Game {
       closeInspector() {
         game.clearTowerSelection();
       },
+      setCamera(position: [number, number, number], target: [number, number, number]) {
+        game.world.camera.position.set(...position);
+        game.world.controls.target.set(...target);
+        game.world.controls.update();
+        game.world.render();
+      },
       screenPoint(kind: 'plot' | 'pad', index: number) {
         const point =
           kind === 'plot'
@@ -1923,6 +1947,11 @@ export class Game {
           pixelRatio: game.world.renderer.getPixelRatio(),
           width: window.innerWidth,
           height: window.innerHeight,
+          camera: {
+            position: game.world.camera.position.toArray(),
+            target: game.world.controls.target.toArray(),
+            distance: game.world.camera.position.distanceTo(game.world.controls.target),
+          },
         };
       },
       async wait(ms: number) {

@@ -18,24 +18,7 @@ import {
 } from 'three';
 import type { CropId, EnemyId, TowerId } from './types';
 import { collapseGroup } from './batch';
-
-export interface CropArt {
-  group: Group;
-  sway: Object3D;
-}
-
-export interface TowerArt {
-  group: Group;
-  spin: Object3D;
-  orb: Mesh;
-}
-
-export interface EnemyArt {
-  group: Group;
-  visual: Group;
-  legs: Object3D[];
-  phase: number;
-}
+import type { ArtProvider, CropArt, EnemyArt, TowerArt } from './art';
 
 const materials = new Map<string, MeshStandardMaterial>();
 
@@ -445,12 +428,13 @@ function buildQuadruped(opts: QuadrupedOptions): EnemyArt {
     aura.castShadow = false;
     group.add(aura);
   }
-  return { group, visual, legs, phase: Math.random() * Math.PI * 2 };
+  return { group, visual, legs, phase: Math.random() * Math.PI * 2, mixer: null };
 }
 
 /* ───────────────────────────── public art factory ───────────────────────────── */
 
-export class ProceduralArt {
+export class ProceduralArt implements ArtProvider {
+  readonly kind = 'procedural' as const;
   private cropTemplates: Record<CropId, Group[]> = { wheat: [], pumpkin: [], flower: [] };
   private towerTemplates: Record<TowerId, TowerArt[]> = { arrow: [], cannon: [], star: [] };
   private enemyTemplates: Record<EnemyId, EnemyArt> = {} as Record<EnemyId, EnemyArt>;
@@ -542,6 +526,7 @@ export class ProceduralArt {
       visual,
       legs,
       phase: Math.random() * Math.PI * 2,
+      mixer: null,
     };
   }
 }

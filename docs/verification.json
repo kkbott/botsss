@@ -1,0 +1,346 @@
+{
+  "startedAt": "2026-11-10T11:53:29.272Z",
+  "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "v26.13.0",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "mobileViewport": {
+      "width": 390,
+      "height": 844
+    }
+  },
+  "build": {
+    "ok": true,
+    "exitCode": 0,
+    "durationMs": 292,
+    "outputTail": "computing gzip size...\ndist/index.html                  13.51 kB │ gzip:   4.13 kB\ndist/assets/index-BE-tFRiN.css   26.78 kB │ gzip:   6.82 kB\ndist/assets/index-BX0orlFQ.js   797.24 kB │ gzip: 209.01 kB\n\n✓ built in 106ms\n\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
+  },
+  "assets": {
+    "loaded": 69,
+    "total": 69,
+    "errors": []
+  },
+  "browser": "chromium 158.0.8127.18 (headless, metal=true)",
+  "checks": [
+    {
+      "name": "npm run build (type-check + static build)",
+      "ok": true,
+      "details": "exit 0"
+    },
+    {
+      "name": "static preview serves the production build",
+      "ok": true,
+      "details": "http://localhost:4173"
+    },
+    {
+      "name": "Chromium/WebGL context launches",
+      "ok": true,
+      "details": "chromium 158.0.8127.18 (headless, metal=true)"
+    },
+    {
+      "name": "all external models load from static assets",
+      "ok": true,
+      "details": "69/69 loaded, 0 errors"
+    },
+    {
+      "name": "start screen and live 3D scene render",
+      "ok": true,
+      "details": "menu visible"
+    },
+    {
+      "name": "HUD is hidden until the run starts",
+      "ok": true,
+      "details": "HUD hidden on menu"
+    },
+    {
+      "name": "starting economy is correct",
+      "ok": true,
+      "details": "{\"gold\":90,\"lives\":20,\"wave\":0}"
+    },
+    {
+      "name": "click-to-plant works",
+      "ok": true,
+      "details": "plot 0 = wheat"
+    },
+    {
+      "name": "click-to-harvest feeds the economy",
+      "ok": true,
+      "details": "gold 100, plot null"
+    },
+    {
+      "name": "drag planting works on the farm grid",
+      "ok": true,
+      "details": "plots 1/2: wheat/wheat"
+    },
+    {
+      "name": "locked farmland can be cleared with coins",
+      "ok": true,
+      "details": "gold 63"
+    },
+    {
+      "name": "star tower builds from the action bar",
+      "ok": true,
+      "details": "towers 1"
+    },
+    {
+      "name": "tower upgrades consume gold and starlight",
+      "ok": true,
+      "details": "level 2, gold 333"
+    },
+    {
+      "name": "tower sells and frees its pad",
+      "ok": true,
+      "details": "towers 0"
+    },
+    {
+      "name": "camera rotates with pointer drag",
+      "ok": true,
+      "details": "distance 37.3"
+    },
+    {
+      "name": "camera zooms with the wheel",
+      "ok": true,
+      "details": "37.3 → 30.4"
+    },
+    {
+      "name": "pause overlay pauses the run",
+      "ok": true,
+      "details": "paused"
+    },
+    {
+      "name": "help overlay pauses the run",
+      "ok": true,
+      "details": "paused"
+    },
+    {
+      "name": "closing help resumes the run",
+      "ok": true,
+      "details": "playing"
+    },
+    {
+      "name": "enemies leak, cost lives and scorch a crop",
+      "ok": true,
+      "details": "lives 8, leaks 6"
+    },
+    {
+      "name": "scorched farmland can be repaired",
+      "ok": true,
+      "details": "gold 117 → 103"
+    },
+    {
+      "name": "an unguarded run reaches a defeat state",
+      "ok": true,
+      "details": "defeat"
+    },
+    {
+      "name": "farming → gold → towers → six waves completes with a victory",
+      "ok": true,
+      "details": "wave 6, lives 18, kills 104"
+    },
+    {
+      "name": "the winning run used crops and tower upgrades end-to-end",
+      "ok": true,
+      "details": "6 towers, harvested 1216 gold"
+    },
+    {
+      "name": "busy battle field renders near 60 fps",
+      "ok": true,
+      "details": "60.1 fps average, p95 18.1 ms, 171 draw calls, 157300 triangles"
+    },
+    {
+      "name": "mobile start screen is usable",
+      "ok": true,
+      "details": "390×844"
+    },
+    {
+      "name": "mobile HUD and action controls fit without page overflow",
+      "ok": true,
+      "details": "{\"documentWidth\":390,\"viewportWidth\":390,\"utilityVisible\":true}"
+    },
+    {
+      "name": "mobile tap-to-plant works",
+      "ok": true,
+      "details": "plot 0 = pumpkin"
+    },
+    {
+      "name": "Kenney CC0 licence file is present",
+      "ok": true,
+      "details": ""
+    },
+    {
+      "name": "Kenney licence allows commercial use",
+      "ok": true,
+      "details": ""
+    },
+    {
+      "name": "Quaternius CC0 evidence links each pack",
+      "ok": true,
+      "details": ""
+    },
+    {
+      "name": "CREDITS enumerates both external sources",
+      "ok": true,
+      "details": ""
+    },
+    {
+      "name": "CC0Tree is documented as evaluated but not shipped",
+      "ok": true,
+      "details": ""
+    },
+    {
+      "name": "every shipped external model is from a licensed source directory",
+      "ok": true,
+      "details": "69 GLB files"
+    },
+    {
+      "name": "browser console has no unhandled errors or page exceptions",
+      "ok": true,
+      "details": "0 errors"
+    }
+  ],
+  "consoleErrors": [],
+  "fps": {
+    "frames": 301,
+    "averageMs": 16.650166112917205,
+    "p95Ms": 18.099999994039536,
+    "fpsAverage": 60.059460861726755,
+    "fpsP95": 55.24861880272417,
+    "metrics": {
+      "fps": 60.00774293457216,
+      "calls": 171,
+      "triangles": 157300,
+      "pixelRatio": 1,
+      "width": 1440,
+      "height": 900,
+      "camera": {
+        "position": [
+          16.19687158383951,
+          22.499999999999996,
+          26.50201224320715
+        ],
+        "target": [
+          -0.09999999999999999,
+          0.3,
+          1.4
+        ],
+        "distance": 37.26310564188494
+      }
+    }
+  },
+  "playthrough": {
+    "outcome": "victory",
+    "wave": 6,
+    "lives": 18,
+    "gold": 188,
+    "star": 8,
+    "kills": 104,
+    "leaks": 1,
+    "harvestedGold": 1216,
+    "simulatedSeconds": 199,
+    "towers": [
+      {
+        "id": "arrow",
+        "pad": 1,
+        "level": 3,
+        "damage": 27,
+        "range": 6.9
+      },
+      {
+        "id": "arrow",
+        "pad": 4,
+        "level": 3,
+        "damage": 27,
+        "range": 6.9
+      },
+      {
+        "id": "cannon",
+        "pad": 2,
+        "level": 3,
+        "damage": 86,
+        "range": 6.2
+      },
+      {
+        "id": "cannon",
+        "pad": 5,
+        "level": 3,
+        "damage": 86,
+        "range": 6.2
+      },
+      {
+        "id": "star",
+        "pad": 3,
+        "level": 3,
+        "damage": 32,
+        "range": 7.4
+      },
+      {
+        "id": "star",
+        "pad": 6,
+        "level": 1,
+        "damage": 12,
+        "range": 6.2
+      }
+    ],
+    "milestones": [
+      {
+        "t": 26,
+        "wave": 1,
+        "lives": 20,
+        "gold": 39,
+        "star": 0
+      },
+      {
+        "t": 60,
+        "wave": 2,
+        "lives": 18,
+        "gold": 79,
+        "star": 4
+      },
+      {
+        "t": 87,
+        "wave": 3,
+        "lives": 18,
+        "gold": 44,
+        "star": 6
+      },
+      {
+        "t": 119,
+        "wave": 4,
+        "lives": 18,
+        "gold": 155,
+        "star": 9
+      },
+      {
+        "t": 151,
+        "wave": 5,
+        "lives": 18,
+        "gold": 148,
+        "star": 7
+      },
+      {
+        "t": 181,
+        "wave": 6,
+        "lives": 18,
+        "gold": 148,
+        "star": 8
+      }
+    ]
+  },
+  "screenshots": [
+    "docs/screenshots/after-defeat.png",
+    "docs/screenshots/after-victory.png",
+    "docs/screenshots/after-mobile-menu.png",
+    "docs/screenshots/after-mobile-game.png"
+  ],
+  "finishedAt": "2026-11-10T11:53:51.748Z",
+  "passed": true,
+  "summary": {
+    "total": 35,
+    "passed": 35,
+    "failed": 0
+  }
+}

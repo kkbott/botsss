@@ -5,6 +5,7 @@ import {
   BoxGeometry,
   BufferAttribute,
   BufferGeometry,
+  CanvasTexture,
   CatmullRomCurve3,
   CircleGeometry,
   Color,
@@ -21,6 +22,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
+  Object3D,
   PCFShadowMap,
   PerspectiveCamera,
   PlaneGeometry,
@@ -42,6 +44,7 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { collapseGroup } from './batch';
+import { ENVIRONMENT_FILES, type EnvironmentAssets } from './assets';
 import { PATH_POINTS, PLOTS, TOWER_PADS, WORLD } from './config';
 import type { PlotRuntime, PlotSpec } from './types';
 import {
@@ -83,6 +86,7 @@ export interface PadVisual {
   group: Group;
   base: Mesh;
   highlight: Mesh;
+  marker: Group;
   spec: (typeof TOWER_PADS)[number];
 }
 
@@ -141,9 +145,9 @@ function skyDome(): Mesh {
     depthWrite: false,
     fog: false,
     uniforms: {
-      topColor: { value: new Color(0x6ea9cf) },
-      midColor: { value: new Color(0xf7dbad) },
-      bottomColor: { value: new Color(0xb9b28f) },
+      topColor: { value: new Color(0x6fa8cc) },
+      midColor: { value: new Color(0xf9ddb3) },
+      bottomColor: { value: new Color(0xbdd3dd) },
       sunDirection: { value: new Vector3(-0.55, 0.36, 0.42).normalize() },
       sunColor: { value: new Color(0xffe6b8) },
     },
@@ -163,7 +167,7 @@ function skyDome(): Mesh {
       varying vec3 vDir;
       void main() {
         float h = clamp(vDir.y * 0.5 + 0.5, 0.0, 1.0);
-        float horizon = smoothstep(0.42, 0.62, h);
+        float horizon = smoothstep(0.36, 0.56, h);
         vec3 col = mix(bottomColor, midColor, smoothstep(0.36, 0.53, h));
         col = mix(col, topColor, horizon);
         float sun = max(dot(normalize(vDir), sunDirection), 0.0);
@@ -178,6 +182,29 @@ function skyDome(): Mesh {
   const sky = new Mesh(new SphereGeometry(180, 32, 18), material);
   sky.frustumCulled = false;
   return sky;
+}
+
+function makeSunSprite(): Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const gradient = ctx.createRadialGradient(128, 128, 8, 128, 128, 124);
+    gradient.addColorStop(0, 'rgba(255, 248, 221, 1)');
+    gradient.addColorStop(0.12, 'rgba(255, 236, 180, 0.9)');
+    gradient.addColorStop(0.34, 'rgba(255, 207, 135, 0.25)');
+    gradient.addColorStop(1, 'rgba(255, 200, 120, 0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 256, 256);
+  }
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  const material = new SpriteMaterial({ map: texture, transparent: true, depthWrite: false, fog: false, blending: AdditiveBlending });
+  const sprite = new Sprite(material);
+  sprite.scale.set(24, 24, 1);
+  sprite.position.set(-40, 29, -30);
+  return sprite;
 }
 
 function makeCloud(random: () => number): Group {
@@ -247,6 +274,7 @@ export class World {
   readonly island = new Group();
   readonly effectsLayer = new Group();
   private readonly staticParts = new Group();
+  private readonly environment: EnvironmentAssets | null;
 
   private readonly initialCamera = new Vector3(WORLD.camera.position.x, WORLD.camera.position.y, WORLD.camera.position.z);
   private readonly initialTarget = new Vector3(WORLD.camera.target.x, WORLD.camera.target.y, WORLD.camera.target.z);
@@ -271,7 +299,8 @@ export class World {
   private readonly random = mulberry32(0xf13d2026);
   private resizeObserver: ResizeObserver | null = null;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, environment: EnvironmentAssets | null = null) {
+    this.environment = environment;
     this.renderer = new WebGLRenderer({
       canvas,
       antialias: true,
@@ -327,8 +356,30 @@ export class World {
     return { curve, length, samples };
   }
 
+  private envInstance(
+    key: keyof typeof ENVIRONMENT_FILES,
+    height: number,
+    options: { maxWidth?: number; shadows?: boolean } = {},
+  ): Group | null {
+    return this.environment?.instance(key, height, options) ?? null;
+  }
+
+  private prop(
+    key: keyof typeof ENVIRONMENT_FILES,
+    height: number,
+    fallback: () => Object3D,
+    options: { maxWidth?: number; shadows?: boolean; fallbackScale?: number } = {},
+  ): Object3D {
+    const asset = this.envInstance(key, height, options);
+    if (asset) return asset;
+    const object = fallback();
+    if (options.fallbackScale) object.scale.multiplyScalar(options.fallbackScale);
+    return object;
+  }
+
   private buildScene() {
     this.scene.add(skyDome());
+    this.scene.add(makeSunSprite());
     this.addLights();
     this.scene.add(this.staticParts);
     this.buildIsland();
@@ -475,13 +526,24 @@ export class World {
       const side = i % 2 ? 1 : -1;
       const offset = 1.25 + this.random() * 0.35;
       if (i % 2 === 0) {
-        const stone = makePathStone(0.45 + this.random() * 0.15);
+        const stoneKey = i % 6 === 0 ? 'path_circle' : 'path_stone';
+        const stone = this.prop(
+          stoneKey,
+          0.07 + this.random() * 0.025,
+          () => makePathStone(0.45 + this.random() * 0.15),
+          { shadows: false, fallbackScale: 0.9, maxWidth: 0.62 },
+        );
         stone.position.set(point.x + normal.x * side * offset, 0.055, point.z + normal.z * side * offset);
         stone.rotation.y = this.random() * Math.PI;
         this.staticParts.add(stone);
       }
       if (i % 3 === 0) {
-        const tuft = makeGrassTuft(0.45 + this.random() * 0.35);
+        const tuft = this.prop(
+          i % 2 ? 'grass' : 'grass_large',
+          0.32 + this.random() * 0.22,
+          () => makeGrassTuft(0.45 + this.random() * 0.35),
+          { shadows: false },
+        );
         tuft.position.set(point.x - normal.x * side * (offset + 0.15), 0.02, point.z - normal.z * side * (offset + 0.15));
         this.staticParts.add(tuft);
       }
@@ -511,7 +573,7 @@ export class World {
     const wood = new MeshStandardMaterial({ color: 0x9b7042, roughness: 1, flatShading: true });
     const weed = new MeshStandardMaterial({ color: 0x5f8a46, roughness: 1, flatShading: true });
     const charred = new MeshStandardMaterial({ color: 0x302c26, roughness: 1, flatShading: true });
-    const glow = new MeshBasicMaterial({ color: 0xf3c455, transparent: true, opacity: 0.55, side: DoubleSide });
+    const glow = new MeshBasicMaterial({ color: 0xf3c455, transparent: true, opacity: 0.3, side: DoubleSide });
     const size = WORLD.farm.plotSize;
 
     for (const spec of PLOTS) {
@@ -544,6 +606,13 @@ export class World {
         beam.castShadow = true;
         beam.receiveShadow = true;
         group.add(beam);
+      }
+
+      for (const z of [-0.44, 0, 0.44]) {
+        const furrow = new Mesh(new BoxGeometry(size * 0.8, 0.018, 0.065), soilDark);
+        furrow.position.set(0, 0.196, z);
+        furrow.receiveShadow = true;
+        group.add(furrow);
       }
 
       const cropAnchor = new Group();
@@ -584,15 +653,15 @@ export class World {
       group.add(highlight);
 
       const matureGlow = new Group();
-      const glowRing = new Mesh(new RingGeometry(0.58, 0.7, 30), glow);
+      const glowRing = new Mesh(new RingGeometry(0.56, 0.64, 30), glow);
       glowRing.rotation.x = -Math.PI / 2;
-      glowRing.position.y = 0.02;
+      glowRing.position.y = 0.27;
       matureGlow.add(glowRing);
       const spark = new Mesh(new IcosahedronGeometry(0.09, 0), new MeshBasicMaterial({ color: 0xffe79b }));
-      spark.position.set(0.42, 0.85, 0.2);
+      spark.position.set(0.42, 1.5, 0.2);
       matureGlow.add(spark);
       const spark2 = new Mesh(new IcosahedronGeometry(0.06, 0), new MeshBasicMaterial({ color: 0xfff2c4 }));
-      spark2.position.set(-0.36, 1.12, -0.24);
+      spark2.position.set(-0.36, 1.9, -0.24);
       matureGlow.add(spark2);
       matureGlow.visible = false;
       group.add(matureGlow);
@@ -608,25 +677,57 @@ export class World {
     // Low fence around the south-west edge of the farm for a lived-in silhouette.
     const southZ = WORLD.farm.startZ + (WORLD.farm.rows - 1) * WORLD.farm.spacing + 1.28;
     const westX = WORLD.farm.startX - 1.28;
-    for (let i = 0; i < 4; i++) {
-      const fence = makeFenceSegment(1.55);
-      fence.position.set(westX + 1.6 + i * 1.72, 0, southZ);
+    for (let i = 0; i < 5; i++) {
+      const fence = this.prop('fence', 1.02, () => makeFenceSegment(1.55), { maxWidth: 1.5 });
+      fence.position.set(westX + 1.1 + i * 1.52, 0, southZ);
       fence.rotation.y = 0;
       this.staticParts.add(fence);
     }
-    for (let i = 0; i < 3; i++) {
-      const fence = makeFenceSegment(1.55);
-      fence.position.set(westX, 0, southZ - 1.72 - i * 1.72);
+    for (let i = 0; i < 4; i++) {
+      const fence = this.prop('fence', 1.02, () => makeFenceSegment(1.55), { maxWidth: 1.5 });
+      fence.position.set(westX, 0, southZ - 1.3 - i * 1.52);
       fence.rotation.y = Math.PI / 2;
       this.staticParts.add(fence);
+    }
+    const gate = this.prop('fence_gate', 1.22, () => makeFenceSegment(1.3), { maxWidth: 1.45 });
+    gate.position.set(westX + 8.25, 0, southZ);
+    gate.rotation.y = Math.PI / 2;
+    this.staticParts.add(gate);
+    const northZ = WORLD.farm.startZ - 1.3;
+    for (let i = 0; i < 4; i++) {
+      const backFence = this.prop('fence_simple', 0.9, () => makeFenceSegment(1.55), { maxWidth: 1.4 });
+      backFence.position.set(westX + 1.1 + i * 1.52, 0, northZ);
+      this.staticParts.add(backFence);
     }
 
     // Soil path from the farmhouse to the farm gate.
     for (let i = 0; i < 8; i++) {
-      const stone = makePathStone(0.38 + this.random() * 0.16);
+      const stone = this.prop('path_stone', 0.06 + this.random() * 0.02, () => makePathStone(0.38 + this.random() * 0.16), {
+        shadows: false,
+        fallbackScale: 0.9,
+        maxWidth: 0.5,
+      });
       stone.position.set(-8.8 + i * 0.5, 0.055, southZ + 1.3 + Math.sin(i * 0.7) * 0.18);
+      stone.rotation.y = this.random() * Math.PI;
       this.staticParts.add(stone);
     }
+
+    // Hand props around the field: pots, logs and a stump.
+    const pot = this.prop('pot_large', 0.6, () => makeCrate(), { fallbackScale: 0.8 });
+    pot.position.set(-10.55, 0, 1.0);
+    this.staticParts.add(pot);
+    const smallPot = this.prop('pot_small', 0.38, () => makeCrate(), { fallbackScale: 0.5 });
+    smallPot.position.set(-10.15, 0, 1.45);
+    this.staticParts.add(smallPot);
+    const stump = this.prop('stump', 0.52, () => makeBarrel(), { fallbackScale: 0.6 });
+    stump.position.set(-10.0, 0, -4.6);
+    stump.rotation.y = 0.4;
+    this.staticParts.add(stump);
+    const log = this.prop('log', 0.42, () => makeBarrel(), { fallbackScale: 0.5 });
+    log.position.set(-10.9, 0, -4.1);
+    log.rotation.y = 0.8;
+    log.rotation.z = 0.25;
+    this.staticParts.add(log);
   }
 
   private buildPads() {
@@ -658,6 +759,22 @@ export class World {
         pebble.position.set(Math.cos(a) * 1.28, 0.05, Math.sin(a) * 1.28);
         group.add(pebble);
       }
+      const marker = new Group();
+      const gem = new Mesh(
+        new IcosahedronGeometry(0.17, 0),
+        new MeshBasicMaterial({ color: 0xf3c455, transparent: true, opacity: 0.9 }),
+      );
+      gem.position.y = 1.1;
+      marker.add(gem);
+      const markerRing = new Mesh(
+        new TorusGeometry(0.31, 0.017, 4, 20),
+        new MeshBasicMaterial({ color: 0xf3c455, transparent: true, opacity: 0.5 }),
+      );
+      markerRing.rotation.x = Math.PI / 2;
+      markerRing.position.y = 1.1;
+      marker.add(markerRing);
+      marker.userData.spin = 0.6;
+      group.add(marker);
       const highlight = new Mesh(
         new RingGeometry(1.18, 1.34, 32),
         new MeshBasicMaterial({ color: 0xf3c455, transparent: true, opacity: 0.8, side: DoubleSide }),
@@ -666,9 +783,9 @@ export class World {
       highlight.position.y = 0.33;
       highlight.visible = false;
       group.add(highlight);
-      collapseGroup(group, { keep: [highlight] });
+      collapseGroup(group, { keep: [highlight, marker] });
       this.scene.add(group);
-      this.padVisuals.push({ group, base, highlight, spec });
+      this.padVisuals.push({ group, base, highlight, marker, spec });
     }
   }
 
@@ -691,16 +808,16 @@ export class World {
     glow.position.set(core.x, 0.07, core.z);
     this.staticParts.add(glow);
 
-    const tree = makeRoundTree(4.8, 1);
+    const tree = this.envInstance('tree_common', 4.8, { maxWidth: 4.6 }) ?? makeRoundTree(4.8, 1);
     tree.position.set(core.x - 4.6, 0, core.z - 2.2);
-    tree.scale.setScalar(1.0);
+    tree.rotation.y = 0.4;
     this.staticParts.add(tree);
-    const tree2 = makePineTree(4.2, 2);
+    const tree2 = this.envInstance('pine_tall', 4.2, { maxWidth: 2.4 }) ?? makePineTree(4.2, 2);
     tree2.position.set(core.x + 3.2, 0, core.z - 2.0);
-    tree2.scale.setScalar(0.85);
+    tree2.rotation.y = 1.2;
     this.staticParts.add(tree2);
 
-    const fence = makeFenceSegment(2.3);
+    const fence = this.prop('fence', 1.0, () => makeFenceSegment(2.3));
     fence.position.set(core.x - 2.5, 0, core.z + 2.4);
     fence.rotation.y = 0.2;
     this.staticParts.add(fence);
@@ -708,7 +825,7 @@ export class World {
     const beaconMaterial = new MeshBasicMaterial({
       color: 0x9de9ff,
       transparent: true,
-      opacity: 0.14,
+      opacity: 0.07,
       depthWrite: false,
       side: DoubleSide,
       blending: 2,
@@ -720,7 +837,7 @@ export class World {
     this.scene.add(beacon);
     const beaconInner = new Mesh(
       new CylinderGeometry(0.06, 0.18, 5.2, 8, 1, true),
-      new MeshBasicMaterial({ color: 0xfff0c9, transparent: true, opacity: 0.28, depthWrite: false, blending: 2 }),
+      new MeshBasicMaterial({ color: 0xfff0c9, transparent: true, opacity: 0.14, depthWrite: false, blending: 2 }),
     );
     beaconInner.position.set(core.x, 2.8, core.z);
     this.scene.add(beaconInner);
@@ -743,70 +860,90 @@ export class World {
     light.rotation.x = -Math.PI / 2;
     light.position.set(spawn.x, 0.06, spawn.z);
     this.staticParts.add(light);
+
+    const portalRocks = [
+      ['rock_tall', 1.15, -1.2, 0.6],
+      ['rock_a', 0.8, 1.0, 1.0],
+      ['rock_group', 0.65, 0.7, -1.1],
+    ] as const;
+    for (const [key, height, dx, dz] of portalRocks) {
+      const rock = this.envInstance(key, height, { maxWidth: 1.9 });
+      if (!rock) continue;
+      rock.position.set(spawn.x + dx, 0, spawn.z + dz);
+      rock.rotation.y = this.random() * Math.PI;
+      this.staticParts.add(rock);
+    }
   }
 
   private buildFarmstead() {
     const d = WORLD.decorations;
-    const house = makeHouse();
+    const house = this.prop('house', 3.45, () => makeHouse(), { fallbackScale: 1.35 });
     house.position.set(d.farmhouse.x, 0, d.farmhouse.z);
     house.rotation.y = d.farmhouse.rotation;
-    house.scale.setScalar(1.35);
     this.staticParts.add(house);
 
-    const windmill = makeWindmill();
-    windmill.group.position.set(d.windmill.x, 0, d.windmill.z);
-    windmill.group.rotation.y = d.windmill.rotation;
-    windmill.group.scale.setScalar(1.18);
-    collapseGroup(windmill.group, { keep: [windmill.blades] });
-    this.scene.add(windmill.group);
-    this.windmillBlades = windmill.blades;
+    const windmill = this.envInstance('windmill', 5.2);
+    if (windmill) {
+      windmill.position.set(d.windmill.x, 0, d.windmill.z);
+      windmill.rotation.y = d.windmill.rotation;
+      this.staticParts.add(windmill);
+      this.windmillBlades = null;
+    } else {
+      const fallback = makeWindmill();
+      fallback.group.position.set(d.windmill.x, 0, d.windmill.z);
+      fallback.group.rotation.y = d.windmill.rotation;
+      fallback.group.scale.setScalar(1.18);
+      collapseGroup(fallback.group, { keep: [fallback.blades] });
+      this.scene.add(fallback.group);
+      this.windmillBlades = fallback.blades;
+    }
 
-    const market = makeMarket();
+    const market = this.prop('market', 2.65, () => makeMarket(), { fallbackScale: 0.95 });
     market.position.set(d.market.x, 0, d.market.z);
     market.rotation.y = d.market.rotation;
-    market.scale.setScalar(0.95);
     this.staticParts.add(market);
 
-    const well = makeWell();
+    const well = this.prop('well', 2.0, () => makeWell());
     well.position.set(d.well.x, 0, d.well.z);
     well.rotation.y = d.well.rotation;
     this.staticParts.add(well);
 
-    const hay = makeHaystack();
+    const hay = this.prop('hay', 1.45, () => makeHaystack(), { fallbackScale: 1.1 });
     hay.position.set(d.hay.x, 0, d.hay.z);
     hay.rotation.y = d.hay.rotation;
-    hay.scale.setScalar(1.1);
     this.staticParts.add(hay);
 
-    const crates = makeCrate();
+    const crates = this.prop('crate', 0.8, () => makeCrate());
     crates.position.set(d.crates.x, 0, d.crates.z);
     crates.rotation.y = d.crates.rotation;
     this.staticParts.add(crates);
-    const crate2 = makeCrate();
-    crate2.position.set(d.crates.x + 0.75, 0.6, d.crates.z + 0.15);
+    const crate2 = this.prop('crate', 0.55, () => makeCrate(), { fallbackScale: 0.8 });
+    crate2.position.set(d.crates.x + 0.75, 0.55, d.crates.z + 0.15);
     crate2.rotation.y = d.crates.rotation + 0.4;
-    crate2.scale.setScalar(0.8);
     this.staticParts.add(crate2);
-    const barrel = makeBarrel();
+    const barrel = this.prop('barrel', 0.95, () => makeBarrel());
     barrel.position.set(d.crates.x + 0.25, 0, d.crates.z + 1.1);
     this.staticParts.add(barrel);
 
-    const tent = makeTent();
+    const tent = this.prop('tent', 2.1, () => makeTent(), { fallbackScale: 0.8 });
     tent.position.set(-5.0, 0, -5.4);
     tent.rotation.y = -0.5;
-    tent.scale.setScalar(0.8);
     this.staticParts.add(tent);
 
-    const statue = makeStatue();
+    const statue = this.prop('statue_column', 2.4, () => makeStatue(), { fallbackScale: 1.15 });
     statue.position.set(-1.9, 0, 7.1);
     statue.rotation.y = 0.2;
-    statue.scale.setScalar(1.15);
     this.staticParts.add(statue);
 
-    const barrels = makeBarrel();
+    const barrels = this.prop('barrel', 0.95, () => makeBarrel());
     barrels.position.set(-11.0, 0, 4.05);
     barrels.rotation.y = 0.7;
     this.staticParts.add(barrels);
+
+    const firewood = this.prop('campfire', 0.4, () => makeCrate(), { fallbackScale: 0.5 });
+    firewood.position.set(-8.9, 0, 4.2);
+    firewood.rotation.y = 0.4;
+    this.staticParts.add(firewood);
   }
 
   private buildPond() {
@@ -836,12 +973,16 @@ export class World {
 
     for (let i = 0; i < 13; i++) {
       const a = (i / 13) * Math.PI * 2 + 0.2;
-      const rock = makeRock(0.18 + this.random() * 0.24, 0x7a7d70);
+      const rock = this.prop('rock_a', 0.32 + this.random() * 0.32, () => makeRock(0.18 + this.random() * 0.24, 0x7a7d70), {
+        maxWidth: 1.2,
+        shadows: false,
+      });
       rock.position.set(pond.x + Math.cos(a) * pond.radius * (1.08 + this.random() * 0.12), 0.03, pond.z + Math.sin(a) * pond.radius * 1.08);
+      rock.rotation.y = this.random() * Math.PI;
       this.staticParts.add(rock);
     }
-    for (let i = 0; i < 4; i++) {
-      const lily = makeLily(0.9 + this.random() * 0.5);
+    for (let i = 0; i < 5; i++) {
+      const lily = this.prop('lily', 0.06 + this.random() * 0.03, () => makeLily(0.9 + this.random() * 0.5), { shadows: false, maxWidth: 0.5 });
       lily.position.set(pond.x + (this.random() - 0.5) * 2.4, 0.06, pond.z + (this.random() - 0.5) * 2.4);
       lily.rotation.y = this.random() * Math.PI;
       this.staticParts.add(lily);
@@ -859,10 +1000,14 @@ export class World {
     // Reeds at the pond edge.
     for (let i = 0; i < 9; i++) {
       const a = (i / 9) * Math.PI * 2 + 0.6;
-      const reed = new Mesh(new ConeGeometry(0.035, 0.9 + this.random() * 0.7, 3), new MeshStandardMaterial({ color: 0x6c8e4e, roughness: 1 }));
-      reed.position.set(pond.x + Math.cos(a) * pond.radius * 1.12, 0.5, pond.z + Math.sin(a) * pond.radius * 1.12);
-      reed.rotation.z = (this.random() - 0.5) * 0.2;
-      reed.castShadow = false;
+      const reed = this.prop(
+        'grass_large',
+        0.8 + this.random() * 0.55,
+        () => new Mesh(new ConeGeometry(0.035, 0.9 + this.random() * 0.7, 3), new MeshStandardMaterial({ color: 0x6c8e4e, roughness: 1 })),
+        { shadows: false },
+      );
+      reed.position.set(pond.x + Math.cos(a) * pond.radius * 1.12, 0.02, pond.z + Math.sin(a) * pond.radius * 1.12);
+      reed.rotation.y = this.random() * Math.PI;
       this.staticParts.add(reed);
     }
   }
@@ -907,78 +1052,121 @@ export class World {
       if (treeSpots.some(([tx, tz]) => Math.hypot(tx - x, tz - z) < 2.7)) continue;
       treeSpots.push([x, z, 3.0 + this.random() * 2.2]);
     }
+    const treeVariants = ['tree_common', 'tree_autumn', 'tree_birch', 'pine_tall', 'oak', 'tree_small'] as const;
     treeSpots.forEach(([x, z, height], i) => {
-      const tree = i % 3 === 0 ? makeRoundTree(height, i) : makePineTree(height, i);
+      const key = treeVariants[i % treeVariants.length];
+      const asset = this.envInstance(key, height, { maxWidth: 4.4 });
+      let tree: Object3D;
+      if (asset) tree = asset;
+      else {
+        tree = i % 3 === 0 ? makeRoundTree(height, i) : makePineTree(height, i);
+        tree.scale.setScalar(0.9 + this.random() * 0.2);
+      }
       tree.position.set(x, 0, z);
       tree.rotation.y = this.random() * Math.PI * 2;
-      tree.scale.setScalar(0.9 + this.random() * 0.2);
       this.staticParts.add(tree);
     });
 
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < 26; i++) {
       const x = (this.random() * 2 - 1) * WORLD.island.rx * 0.88;
       const z = (this.random() * 2 - 1) * WORLD.island.rz * 0.88;
       if (this.blocked(x, z, 0.3)) continue;
-      const rock = makeRock(0.25 + this.random() * 0.65, i % 4 === 0 ? 0x8e8d7e : 0x7d8071);
+      const rockKeys = ['rock_a', 'rock_c', 'rock_tall', 'rock_group', 'rock'] as const;
+      const rock = this.prop(rockKeys[i % rockKeys.length], 0.45 + this.random() * 0.85, () =>
+        makeRock(0.25 + this.random() * 0.65, i % 4 === 0 ? 0x8e8d7e : 0x7d8071),
+      { maxWidth: 2.0, shadows: true });
       rock.position.set(x, 0, z);
       rock.rotation.y = this.random() * Math.PI * 2;
       this.staticParts.add(rock);
     }
 
-    for (let i = 0; i < 42; i++) {
+    for (let i = 0; i < 58; i++) {
       const x = (this.random() * 2 - 1) * WORLD.island.rx * 0.89;
       const z = (this.random() * 2 - 1) * WORLD.island.rz * 0.89;
       if (this.blocked(x, z, 0.15)) continue;
-      const tuft = makeGrassTuft(0.35 + this.random() * 0.4, i % 3 === 0 ? 0x88b366 : 0x709a52);
-      tuft.position.set(x, 0, z);
-      tuft.rotation.y = this.random() * Math.PI;
-      this.staticParts.add(tuft);
+      const grass = this.prop(
+        i % 4 === 0 ? 'grass_large' : 'grass',
+        0.26 + this.random() * 0.3,
+        () => makeGrassTuft(0.35 + this.random() * 0.4, i % 3 === 0 ? 0x88b366 : 0x709a52),
+        { shadows: false },
+      );
+      grass.position.set(x, 0, z);
+      grass.rotation.y = this.random() * Math.PI;
+      this.staticParts.add(grass);
     }
 
-    const flowerColors = [0xe8c45c, 0xb9a5ff, 0xef8056, 0xf6edda, 0x8deee0];
-    for (let i = 0; i < 34; i++) {
+    const flowerKeys = ['flowers_purple', 'flowers_yellow', 'flowers_red'] as const;
+    for (let i = 0; i < 40; i++) {
       const x = (this.random() * 2 - 1) * WORLD.island.rx * 0.88;
       const z = (this.random() * 2 - 1) * WORLD.island.rz * 0.88;
       if (this.blocked(x, z, 0.1)) continue;
-      const flower = makeFlower(0.55 + this.random() * 0.45, flowerColors[i % flowerColors.length]);
+      const flower = this.prop(flowerKeys[i % flowerKeys.length], 0.32 + this.random() * 0.24, () =>
+        makeFlower(0.55 + this.random() * 0.45, [0xe8c45c, 0xb9a5ff, 0xef8056][i % 3]),
+      { shadows: false });
       flower.position.set(x, 0, z);
+      flower.rotation.y = this.random() * Math.PI;
       this.staticParts.add(flower);
     }
 
-    for (let i = 0; i < 8; i++) {
-      const x = (this.random() * 2 - 1) * WORLD.island.rx * 0.84;
-      const z = (this.random() * 2 - 1) * WORLD.island.rz * 0.84;
+    for (let i = 0; i < 7; i++) {
+      const x = (this.random() * 2 - 1) * WORLD.island.rx * 0.82;
+      const z = (this.random() * 2 - 1) * WORLD.island.rz * 0.82;
       if (this.blocked(x, z, 0.1)) continue;
-      const mushroom = new Group();
-      const stem = new Mesh(new CylinderGeometry(0.05, 0.07, 0.28, 5), new MeshStandardMaterial({ color: 0xe8dcc1, roughness: 1 }));
-      stem.position.y = 0.14;
-      mushroom.add(stem);
-      const cap = new Mesh(
-        new ConeGeometry(0.2, 0.15, 7),
-        new MeshStandardMaterial({ color: i % 2 ? 0xc55c48 : 0xd9b56d, roughness: 1, flatShading: true }),
-      );
-      cap.position.y = 0.3;
-      mushroom.add(cap);
+      const mushroom = this.prop(i % 2 ? 'mushroom_red' : 'mushroom_tan', 0.28 + this.random() * 0.18, () => {
+        const fallback = new Group();
+        const stem = new Mesh(new CylinderGeometry(0.05, 0.07, 0.28, 5), new MeshStandardMaterial({ color: 0xe8dcc1, roughness: 1 }));
+        stem.position.y = 0.14;
+        fallback.add(stem);
+        const cap = new Mesh(
+          new ConeGeometry(0.2, 0.15, 7),
+          new MeshStandardMaterial({ color: i % 2 ? 0xc55c48 : 0xd9b56d, roughness: 1, flatShading: true }),
+        );
+        cap.position.y = 0.3;
+        fallback.add(cap);
+        return fallback;
+      }, { shadows: false });
       mushroom.position.set(x, 0, z);
+      mushroom.rotation.y = this.random() * Math.PI;
       this.staticParts.add(mushroom);
     }
 
-    // A couple of stumps and a log for silhouette variety.
     for (let i = 0; i < 4; i++) {
       const x = (this.random() * 2 - 1) * WORLD.island.rx * 0.8;
       const z = (this.random() * 2 - 1) * WORLD.island.rz * 0.8;
       if (this.blocked(x, z, 0.4)) continue;
-      const stump = new Mesh(new CylinderGeometry(0.35, 0.45, 0.4, 7), new MeshStandardMaterial({ color: 0x8a6138, roughness: 1, flatShading: true }));
-      stump.position.set(x, 0.2, z);
-      stump.castShadow = true;
-      stump.receiveShadow = true;
+      const stump = this.prop('stump', 0.45 + this.random() * 0.2, () => {
+        const fallback = new Mesh(new CylinderGeometry(0.35, 0.45, 0.4, 7), new MeshStandardMaterial({ color: 0x8a6138, roughness: 1, flatShading: true }));
+        fallback.position.y = 0.2;
+        return fallback;
+      });
+      stump.position.set(x, 0, z);
+      stump.rotation.y = this.random() * Math.PI;
       this.staticParts.add(stump);
     }
 
-    // Small crop patch by the farmhouse: a hint that the whole plateau is farmed.
     for (let i = 0; i < 5; i++) {
-      const tuft = makeGrassTuft(0.45, 0x7ca055);
-      tuft.position.set(-9.3 + i * 0.4, 0.05, 7.3);
+      const x = (this.random() * 2 - 1) * WORLD.island.rx * 0.78;
+      const z = (this.random() * 2 - 1) * WORLD.island.rz * 0.78;
+      if (this.blocked(x, z, 0.5)) continue;
+      const bushKeys = ['bush', 'bush_berries', 'plant_bush', 'plant_bush_detailed'] as const;
+      const bush = this.prop(bushKeys[i % bushKeys.length], 0.9 + this.random() * 0.5, () => makeRock(0.4, 0x6f9a4e), {
+        maxWidth: 1.8,
+      });
+      bush.position.set(x, 0, z);
+      bush.rotation.y = this.random() * Math.PI;
+      this.staticParts.add(bush);
+    }
+
+    const obelisk = this.prop('statue_obelisk', 2.6, () => makeStatue(), { fallbackScale: 1.1 });
+    obelisk.position.set(0.6, 0, -6.2);
+    obelisk.rotation.y = -0.4;
+    this.staticParts.add(obelisk);
+
+    // A patch of tiny wildflowers by the farmhouse.
+    for (let i = 0; i < 6; i++) {
+      const tuft = this.prop('flowers_yellow', 0.28, () => makeFlower(0.45, 0xe8c45c), { shadows: false });
+      tuft.position.set(-9.3 + i * 0.35, 0, 7.3);
+      tuft.rotation.y = this.random() * Math.PI;
       this.staticParts.add(tuft);
     }
   }
@@ -1044,13 +1232,25 @@ export class World {
   }
 
   private buildClouds() {
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 5; i++) {
       const cloud = makeCloud(this.random);
-      const angle = (i / 7) * Math.PI * 2 + 0.3;
-      const radius = 36 + this.random() * 16;
-      cloud.position.set(Math.cos(angle) * radius, 12 + this.random() * 8, Math.sin(angle) * radius * 0.8);
-      cloud.scale.setScalar(1.5 + this.random() * 1.6);
-      cloud.userData.drift = 0.008 + this.random() * 0.012;
+      const angle = (i / 5) * Math.PI * 2 + 0.5;
+      const radius = 46 + this.random() * 14;
+      cloud.position.set(Math.cos(angle) * radius, 17 + this.random() * 8, Math.sin(angle) * radius * 0.8);
+      cloud.scale.setScalar(1.1 + this.random() * 0.9);
+      cloud.userData.drift = 0.006 + this.random() * 0.008;
+      collapseGroup(cloud);
+      this.clouds.push(cloud);
+      this.scene.add(cloud);
+    }
+    // A few low wisps make the island read as floating without stealing the view.
+    for (let i = 0; i < 3; i++) {
+      const cloud = makeCloud(this.random);
+      const angle = 1.1 + (i / 3) * Math.PI * 1.4;
+      const radius = 32 + this.random() * 8;
+      cloud.position.set(Math.cos(angle) * radius, -6 + this.random() * 2.5, Math.sin(angle) * radius * 0.8);
+      cloud.scale.setScalar(1.6 + this.random() * 0.8);
+      cloud.userData.drift = 0.004 + this.random() * 0.004;
       collapseGroup(cloud);
       this.clouds.push(cloud);
       this.scene.add(cloud);
@@ -1105,6 +1305,11 @@ export class World {
       if (!glow.visible) return;
       glow.rotation.y += dt * 0.8;
       glow.children[0].scale.setScalar(1 + Math.sin(t * 2.4 + i) * 0.1);
+    });
+    this.padVisuals.forEach((pad, i) => {
+      if (!pad.marker.visible) return;
+      pad.marker.rotation.y += dt * 0.6;
+      pad.marker.position.y = Math.sin(t * 1.5 + i) * 0.06;
     });
     this.clouds.forEach((cloud) => {
       cloud.rotation.y += dt * 0.005;

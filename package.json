@@ -9,7 +9,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 4173 --strictPort",
     "verify": "node scripts/verify.mjs",
-    "shots": "node scripts/screenshots.mjs"
+    "screenshots": "node scripts/screenshots.mjs",
+    "setup:browser": "playwright install chromium"
   },
   "dependencies": {
     "three": "0.187.0"
@@ -19,5 +20,8 @@
     "playwright": "1.65.0",
     "typescript": "7.0.2",
     "vite": "8.3.7"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
   }
 }

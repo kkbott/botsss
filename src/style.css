@@ -129,7 +129,7 @@ kbd {
   left: 16px;
   right: 16px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 390px) minmax(0, 1fr);
+  grid-template-columns: max-content minmax(280px, 380px) minmax(0, 1fr);
   align-items: start;
   gap: 16px;
   pointer-events: none;
@@ -192,16 +192,16 @@ kbd {
 
 .resource-chips {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 7px;
+  flex-wrap: nowrap;
 }
 
 .chip {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   height: 38px;
-  padding: 0 12px 0 8px;
+  padding: 0 10px 0 7px;
   border-radius: 12px;
   background: var(--panel);
   border: 1px solid var(--line);
@@ -1410,7 +1410,7 @@ kbd {
 
 .enemy-bar {
   position: absolute;
-  width: 46px;
+  width: 54px;
   transform: translate(-50%, -50%);
   opacity: 0;
   transition: opacity 0.15s;
@@ -1422,7 +1422,7 @@ kbd {
 }
 
 .enemy-bar-track {
-  height: 5px;
+  height: 6px;
   border-radius: 99px;
   background: rgba(7, 14, 9, 0.75);
   border: 1px solid rgba(0, 0, 0, 0.4);
@@ -1438,11 +1438,11 @@ kbd {
 }
 
 .enemy-bar.is-boss {
-  width: 86px;
+  width: 96px;
 }
 
 .enemy-bar.is-boss .enemy-bar-track {
-  height: 7px;
+  height: 8px;
 }
 
 .enemy-name {
@@ -1558,7 +1558,7 @@ kbd {
 
 @media (max-width: 1180px) {
   #hud {
-    grid-template-columns: minmax(0, 1fr) minmax(260px, 340px) auto;
+    grid-template-columns: max-content minmax(260px, 340px) minmax(0, 1fr);
     gap: 10px;
   }
   .bottom-inner {
@@ -1733,7 +1733,17 @@ kbd {
     width: 14px;
   }
   #bottom-bar {
-    padding: 26px 8px calc(8px + var(--safe-bottom));
+    padding: 44px 8px calc(8px + var(--safe-bottom));
+  }
+  #bottom-bar::before {
+    content: '← 左右滑动选择更多 →';
+    position: absolute;
+    top: 15px;
+    left: 12px;
+    font-size: 8px;
+    letter-spacing: 0.08em;
+    color: rgba(246, 237, 218, 0.45);
+    pointer-events: none;
   }
   .bottom-inner {
     flex-wrap: nowrap;
@@ -1785,17 +1795,24 @@ kbd {
     margin-top: 2px;
   }
   .tool-utility {
-    flex: 0 0 auto;
-    flex-direction: column;
+    position: absolute;
+    top: 5px;
+    right: 9px;
+    flex-direction: row;
     justify-content: flex-end;
     width: auto;
-    margin-top: 0;
+    margin: 0;
+    gap: 5px;
+    flex: 0 0 auto;
   }
   .utility-btn {
-    min-width: 84px;
-    padding: 7px 8px;
-    font-size: 9.5px;
-    gap: 5px;
+    min-width: 78px;
+    padding: 6px 8px;
+    font-size: 9px;
+    gap: 4px;
+  }
+  .tool-group-title {
+    display: none;
   }
   .utility-btn kbd {
     display: none;
@@ -1806,7 +1823,7 @@ kbd {
   .inspector {
     left: 8px;
     right: 8px;
-    bottom: calc(176px + var(--safe-bottom));
+    bottom: calc(192px + var(--safe-bottom));
     width: auto;
     padding: 13px;
   }
@@ -1818,7 +1835,7 @@ kbd {
     display: none;
   }
   .toast-layer {
-    bottom: calc(198px + var(--safe-bottom));
+    bottom: calc(214px + var(--safe-bottom));
     width: calc(100vw - 30px);
   }
   .toast {
