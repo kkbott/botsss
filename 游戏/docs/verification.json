@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-10T13:17:07.540Z",
+  "startedAt": "2026-11-10T16:00:21.860Z",
   "environment": {
     "platform": "darwin",
     "arch": "arm64",
@@ -16,8 +16,8 @@
   "build": {
     "ok": true,
     "exitCode": 0,
-    "durationMs": 359,
-    "outputTail": "computing gzip size...\ndist/index.html                  13.51 kB │ gzip:   4.13 kB\ndist/assets/index-B8n5nLy-.css   26.90 kB │ gzip:   6.87 kB\ndist/assets/index-Bg4FWH-h.js   797.57 kB │ gzip: 209.13 kB\n\n✓ built in 138ms\n\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
+    "durationMs": 436,
+    "outputTail": "computing gzip size...\ndist/index.html                  15.39 kB │ gzip:   4.66 kB\ndist/assets/index-CM_kQZD9.css   31.29 kB │ gzip:   7.71 kB\ndist/assets/index-CDK-zWIR.js   821.49 kB │ gzip: 215.71 kB\n\n✓ built in 152ms\n\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
   },
   "assets": {
     "loaded": 69,
@@ -64,52 +64,142 @@
     {
       "name": "starting economy is correct",
       "ok": true,
-      "details": "{\"gold\":90,\"lives\":20,\"wave\":0}"
+      "details": "{\"gold\":150,\"lives\":20,\"wave\":0}"
     },
     {
-      "name": "click-to-plant works",
+      "name": "every plot starts as untouched wild land",
       "ok": true,
-      "details": "plot 0 = wheat"
+      "details": "24 plots, 24 wild"
     },
     {
-      "name": "click-to-harvest feeds the economy",
+      "name": "the expanded map has a long path and a full buildable grid",
       "ok": true,
-      "details": "gold 100, plot null"
+      "details": "path 67.7m, 24 buildable plots"
     },
     {
-      "name": "drag planting works on the farm grid",
+      "name": "the run starts in first person at eye height",
       "ok": true,
-      "details": "plots 1/2: wheat/wheat"
+      "details": "mode first, fov 72, eye 1.64"
     },
     {
-      "name": "locked farmland can be cleared with coins",
+      "name": "WASD walks the first-person character",
       "ok": true,
-      "details": "gold 63"
+      "details": "moved 1.52m"
     },
     {
-      "name": "star tower builds from the action bar",
+      "name": "the camera follows the character eye position",
       "ok": true,
-      "details": "towers 1"
+      "details": "camera 6.42, 1.65, 1.58"
     },
     {
-      "name": "tower upgrades consume gold and starlight",
+      "name": "mouse look changes the first-person view",
       "ok": true,
-      "details": "level 2, gold 333"
+      "details": "yaw 1.15 → 0.84"
     },
     {
-      "name": "tower sells and frees its pad",
+      "name": "Space jumps and lands again",
       "ok": true,
-      "details": "towers 0"
+      "details": "jump height 0.40m"
     },
     {
-      "name": "camera rotates with pointer drag",
+      "name": "the character lands back on the ground",
       "ok": true,
-      "details": "distance 37.3"
+      "details": "grounded true"
     },
     {
-      "name": "camera zooms with the wheel",
+      "name": "V switches to the overview orbit camera",
       "ok": true,
-      "details": "37.3 → 30.4"
+      "details": "mode overview, fov 46, distance 12.0"
+    },
+    {
+      "name": "V returns to the first-person camera",
+      "ok": true,
+      "details": "mode first, fov 72"
+    },
+    {
+      "name": "E does nothing when no plot is within reach",
+      "ok": true,
+      "details": "gold 150 → 150"
+    },
+    {
+      "name": "walking near a wild plot and pressing E starts reclamation for gold",
+      "ok": true,
+      "details": "gold 136, reclaim {\"progress\":0}"
+    },
+    {
+      "name": "the reclaim process shows a live progress prompt",
+      "ok": true,
+      "details": "prompt “开垦中…”"
+    },
+    {
+      "name": "the timed reclamation animation finishes into farmland",
+      "ok": true,
+      "details": "state farmland, reclaimed 1"
+    },
+    {
+      "name": "reclamation costs escalate as more land is cleared",
+      "ok": true,
+      "details": "next cost 19"
+    },
+    {
+      "name": "a crop is planted at the plot in front of the farmer",
+      "ok": true,
+      "details": "plot 23 wheat, gold 130"
+    },
+    {
+      "name": "crops still grow to maturity on reclaimed land",
+      "ok": true,
+      "details": "stage 3"
+    },
+    {
+      "name": "harvesting next to the crop feeds the economy",
+      "ok": true,
+      "details": "gold 146"
+    },
+    {
+      "name": "a tower is built on the selected wild plot",
+      "ok": true,
+      "details": "towers 1, plot 18 tower, gold 104"
+    },
+    {
+      "name": "a tower base cannot be planted with crops",
+      "ok": true,
+      "details": "plant returned false"
+    },
+    {
+      "name": "viewing a tower opens its inspector",
+      "ok": true,
+      "details": "inspector visible"
+    },
+    {
+      "name": "selling a tower restores its wild land",
+      "ok": true,
+      "details": "plot 18 wild, towers 0"
+    },
+    {
+      "name": "a tower can also occupy empty farmland",
+      "ok": true,
+      "details": "plot 22 tower, underlying farmland"
+    },
+    {
+      "name": "selling that tower returns the plot to farmland",
+      "ok": true,
+      "details": "plot 22 farmland"
+    },
+    {
+      "name": "high-tier towers still consume starlight",
+      "ok": true,
+      "details": "towers 1, star 3"
+    },
+    {
+      "name": "star towers upgrade with gold and starlight",
+      "ok": true,
+      "details": "level 2, star 1"
+    },
+    {
+      "name": "selling the star tower clears its plot",
+      "ok": true,
+      "details": "plots wild"
     },
     {
       "name": "pause overlay pauses the run",
@@ -127,19 +217,19 @@
       "details": "playing"
     },
     {
-      "name": "enemy models face along their movement direction",
+      "name": "enemies leak, cost lives and scorch farmland",
       "ok": true,
-      "details": "facing dots 1.00, 1.00, 1.00, 1.00, 1.00, 1.00"
+      "details": "lives 16, scorched 23"
     },
     {
-      "name": "enemies leak, cost lives and scorch a crop",
+      "name": "enemy models still face their movement direction",
       "ok": true,
-      "details": "lives 8, leaks 6"
+      "details": "3 enemies"
     },
     {
-      "name": "scorched farmland can be repaired",
+      "name": "scorched farmland can be repaired near the plot",
       "ok": true,
-      "details": "gold 117 → 103"
+      "details": "gold 130 → 116"
     },
     {
       "name": "an unguarded run reaches a defeat state",
@@ -149,17 +239,22 @@
     {
       "name": "farming → gold → towers → six waves completes with a victory",
       "ok": true,
-      "details": "wave 6, lives 18, kills 104"
+      "details": "wave 6, lives 20, kills 114"
     },
     {
-      "name": "the winning run used crops and tower upgrades end-to-end",
+      "name": "the winning run reclaimed land, farmed it and built towers on plots",
       "ok": true,
-      "details": "6 towers, harvested 1200 gold"
+      "details": "10 farmland, 14 towers, 3008 harvested gold"
     },
     {
-      "name": "busy battle field renders near 60 fps",
+      "name": "the winning run upgraded towers",
       "ok": true,
-      "details": "60.0 fps average, p95 18.4 ms, 171 draw calls, 157300 triangles"
+      "details": "arrow@0:L3, arrow@18:L3, arrow@5:L3, cannon@23:L3, arrow@2:L2, cannon@19:L2, arrow@6:L2, arrow@12:L2, cannon@1:L2, arrow@22:L2, arrow@3:L2, cannon@4:L2, arrow@17:L2, arrow@11:L2"
+    },
+    {
+      "name": "a busy first-person farm scene renders near 60 fps",
+      "ok": true,
+      "details": "60.1 fps average, p95 18.3 ms, 146 draw calls, 264480 triangles"
     },
     {
       "name": "mobile start screen is usable",
@@ -167,14 +262,19 @@
       "details": "390×844"
     },
     {
-      "name": "mobile HUD and action controls fit without page overflow",
+      "name": "mobile HUD, joystick and interact button fit without overflow",
       "ok": true,
-      "details": "{\"documentWidth\":390,\"viewportWidth\":390,\"utilityVisible\":true}"
+      "details": "{\"documentWidth\":390,\"viewportWidth\":390,\"utilityVisible\":true,\"joystick\":{\"x\":20,\"y\":550,\"w\":118,\"h\":118,\"bottom\":668,\"right\":138},\"interact\":{\"x\":284,\"y\":562,\"w\":86,\"h\":86,\"bottom\":648,\"right\":370},\"touchVisible\":true,\"hudOverlap\":false}"
     },
     {
-      "name": "mobile tap-to-plant works",
+      "name": "the mobile interact button is enabled next to a plot",
       "ok": true,
-      "details": "plot 0 = pumpkin"
+      "details": "{\"title\":\"开垦这块荒地\",\"keyVisible\":false,\"interactEnabled\":true}"
+    },
+    {
+      "name": "tapping the mobile interact button starts reclamation",
+      "ok": true,
+      "details": "reclaim progress 0.22"
     },
     {
       "name": "Kenney CC0 licence file is present",
@@ -215,130 +315,158 @@
   "consoleErrors": [],
   "fps": {
     "frames": 301,
-    "averageMs": 16.663787375355877,
-    "p95Ms": 18.400000005960464,
-    "fpsAverage": 60.01036723973704,
-    "fpsP95": 54.34782606935118,
+    "averageMs": 16.6485049833491,
+    "p95Ms": 18.30000001192093,
+    "fpsAverage": 60.06545338456179,
+    "fpsP95": 54.64480870757285,
     "metrics": {
-      "fps": 60,
-      "calls": 171,
-      "triangles": 157300,
+      "fps": 59.99999999999997,
+      "calls": 146,
+      "triangles": 264480,
       "pixelRatio": 1,
       "width": 1440,
       "height": 900,
+      "mode": "first",
+      "player": {
+        "x": 8.4,
+        "z": 4.6,
+        "yaw": 1.35,
+        "pitch": -0.18
+      },
       "camera": {
         "position": [
-          16.19664896687429,
-          22.499999999999986,
-          26.502155349789305
+          8.4,
+          1.64,
+          4.6
         ],
         "target": [
-          -0.09999999999999999,
-          0.3,
-          1.4
+          0,
+          0.9,
+          1
         ],
-        "distance": 37.263104684855236
+        "fov": 72,
+        "distance": 9.168838530588266
       }
     }
   },
   "playthrough": {
-    "outcome": "victory",
+    "phase": "victory",
     "wave": 6,
-    "lives": 18,
-    "gold": 198,
-    "star": 8,
-    "kills": 104,
-    "leaks": 1,
-    "harvestedGold": 1200,
-    "simulatedSeconds": 198,
+    "lives": 20,
+    "gold": 435,
+    "star": 15,
     "towers": [
       {
         "id": "arrow",
-        "pad": 1,
+        "plot": 0,
         "level": 3,
-        "damage": 27,
+        "damage": 31,
+        "range": 7.5
+      },
+      {
+        "id": "arrow",
+        "plot": 18,
+        "level": 3,
+        "damage": 31,
+        "range": 7.5
+      },
+      {
+        "id": "arrow",
+        "plot": 5,
+        "level": 3,
+        "damage": 31,
+        "range": 7.5
+      },
+      {
+        "id": "cannon",
+        "plot": 23,
+        "level": 3,
+        "damage": 88,
+        "range": 6.7
+      },
+      {
+        "id": "arrow",
+        "plot": 2,
+        "level": 2,
+        "damage": 22,
+        "range": 6.9
+      },
+      {
+        "id": "cannon",
+        "plot": 19,
+        "level": 2,
+        "damage": 60,
+        "range": 6.1
+      },
+      {
+        "id": "arrow",
+        "plot": 6,
+        "level": 2,
+        "damage": 22,
         "range": 6.9
       },
       {
         "id": "arrow",
-        "pad": 4,
-        "level": 3,
-        "damage": 27,
+        "plot": 12,
+        "level": 2,
+        "damage": 22,
         "range": 6.9
       },
       {
         "id": "cannon",
-        "pad": 2,
-        "level": 3,
-        "damage": 86,
-        "range": 6.2
+        "plot": 1,
+        "level": 2,
+        "damage": 60,
+        "range": 6.1
+      },
+      {
+        "id": "arrow",
+        "plot": 22,
+        "level": 2,
+        "damage": 22,
+        "range": 6.9
+      },
+      {
+        "id": "arrow",
+        "plot": 3,
+        "level": 2,
+        "damage": 22,
+        "range": 6.9
       },
       {
         "id": "cannon",
-        "pad": 5,
-        "level": 3,
-        "damage": 86,
-        "range": 6.2
+        "plot": 4,
+        "level": 2,
+        "damage": 60,
+        "range": 6.1
       },
       {
-        "id": "star",
-        "pad": 3,
-        "level": 3,
-        "damage": 32,
-        "range": 7.4
+        "id": "arrow",
+        "plot": 17,
+        "level": 2,
+        "damage": 22,
+        "range": 6.9
       },
       {
-        "id": "star",
-        "pad": 6,
-        "level": 1,
-        "damage": 12,
-        "range": 6.2
+        "id": "arrow",
+        "plot": 11,
+        "level": 2,
+        "damage": 22,
+        "range": 6.9
       }
     ],
-    "milestones": [
-      {
-        "t": 26,
-        "wave": 1,
-        "lives": 20,
-        "gold": 39,
-        "star": 0
-      },
-      {
-        "t": 60,
-        "wave": 2,
-        "lives": 18,
-        "gold": 89,
-        "star": 4
-      },
-      {
-        "t": 87,
-        "wave": 3,
-        "lives": 18,
-        "gold": 54,
-        "star": 6
-      },
-      {
-        "t": 118,
-        "wave": 4,
-        "lives": 18,
-        "gold": 135,
-        "star": 9
-      },
-      {
-        "t": 150,
-        "wave": 5,
-        "lives": 18,
-        "gold": 158,
-        "star": 7
-      },
-      {
-        "t": 180,
-        "wave": 6,
-        "lives": 18,
-        "gold": 158,
-        "star": 8
-      }
-    ]
+    "reclaimed": 10,
+    "farmland": 10,
+    "stats": {
+      "kills": 114,
+      "harvestedGold": 3008,
+      "harvestedStar": 32,
+      "planted": 202,
+      "towersBuilt": 14,
+      "leaks": 0,
+      "playSeconds": 297.5166666667212,
+      "reclaimed": 10
+    }
   },
   "screenshots": [
     "docs/screenshots/after-defeat.png",
@@ -346,11 +474,11 @@
     "docs/screenshots/after-mobile-menu.png",
     "docs/screenshots/after-mobile-game.png"
   ],
-  "finishedAt": "2026-11-10T13:17:30.331Z",
+  "finishedAt": "2026-11-10T16:00:51.944Z",
   "passed": true,
   "summary": {
-    "total": 37,
-    "passed": 37,
+    "total": 57,
+    "passed": 57,
     "failed": 0
   }
 }
