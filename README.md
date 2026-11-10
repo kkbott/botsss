@@ -82,10 +82,11 @@ npm run preview    # 本地预览生产构建（4173）
 | `npm run build`（类型检查 + 静态构建） | ✅ 退出码 0 |
 | 外部 GLB 资产加载 | ✅ 69 / 69，0 错误 |
 | 浏览器控制台异常 / 未处理页面错误 | ✅ 0 |
-| 帧率（5 秒实测，繁忙交战场景） | ✅ 平均 **60.1 fps**，P95 帧时间 **17.9 ms**；171 draw calls / 157,300 triangles；另有 headed Chromium 实测平均 59.8 fps |
+| 帧率（5 秒实测，繁忙交战场景） | ✅ 平均 **60.0 fps**，P95 帧时间 **18.4 ms**；171 draw calls / 157,300 triangles；另有 headed Chromium 实测平均 59.8 fps |
 | 种田 → 金币 → 建塔 → 抵御 6 波 → 再投资 | ✅ 自动玩家以正常初始经济打赢 6 波：18 生命、104 击杀、6 座塔、收获 1200 金币 |
 | 交互验收 | ✅ 点击播种、拖动连播、点击收获、开垦、建塔、升级、拆除、相机旋转/缩放、暂停/帮助、失败与胜利界面 |
 | 怪物模型朝向 | ✅ 模型头部朝向与路径切线一致；自动化回归检查记录 6 / 6 个敌人 facing dot ≈ 1.00 |
+| 首页开始按钮 | ✅ 保留可见的实色金色背景，不再依赖会被主题/扩展剥离的纯渐变 |
 | 漏怪 / 焦土 | ✅ 漏怪扣生命并烧毁农田；14 金币修复焦土 |
 | 移动端（390 × 844） | ✅ 无页面横向溢出；触屏播种可用；底栏操作可见 |
 | 所有外部素材许可证 | ✅ 仅 CC0（Kenney Nature Kit 2.1、Quaternius 五个包），证据与逐项清单见 [`CREDITS.md`](CREDITS.md) 和 [`public/assets/quaternius/LICENSE-EVIDENCE.md`](public/assets/quaternius/LICENSE-EVIDENCE.md) |
@@ -97,6 +98,7 @@ npm run preview    # 本地预览生产构建（4173）
 - **构建**：`npm run build` 无错误；Vite 会提示单个 JS chunk 约 797 kB（gzip 约 209 kB）超过默认提示阈值，这是 Three.js 单包游戏的预期体积，不影响构建。
 - **控制台**：自动化验收中未出现未处理异常。使用软件渲染（SwiftShader）时帧率会明显降低，这是测试环境差异，不是逻辑错误。
 - **60fps**：已在上述环境实测接近 60fps。目标硬件是中低端笔记本，但不同 GPU/浏览器/高分屏（devicePixelRatio）会有差异；游戏没有做画质菜单，像素比上限为 2（窄屏 1.6）。如果设备较弱，可在 `src/game/world.ts` 中调低 `renderer.setPixelRatio` 上限。
+- **首页开始按钮**：按钮现在同时设置实色金色背景和渐变，并去除浏览器原生 button 外观；即使某些主题或浏览器扩展移除了渐变背景，仍会保留金色。
 - **移动端**：为窄屏做了布局与触控适配，使玩法可操作，但不是完整的手柄/平板专属 UI；防御塔和作物过多时底栏卡片需要横向滑动。
 - **资源取舍**：按要求优先评估了 CC0Tree，但其公开仓库只含 FBX 几何、外部贴图未随仓库发布，且与本项目低多边形风格/生长阶段需求不匹配；因此没有采用或打包其文件。改用 Quaternius + Kenney 的 CC0 GLB 资源，原因与完整证据见 `CREDITS.md`。
 - **存档**：游戏进行中的状态只保存在内存；刷新会重新开始一局。最佳波次、胜场和静音设置保存在 `localStorage`。这符合单机、无后端的约束。
@@ -160,7 +162,7 @@ npm run verify          # 构建、启动生产预览并执行完整验收
 npm run screenshots     # 生成 docs/screenshots/after-*.png
 ```
 
-`npm run verify` 会运行 36 项检查并更新 `docs/verification.json`；需要先安装 Playwright Chromium。脚本中的自动游玩使用正常经济与 UI/模拟逻辑，不使用 `addGold` 作弊。
+`npm run verify` 会运行 37 项检查并更新 `docs/verification.json`；需要先安装 Playwright Chromium。脚本中的自动游玩使用正常经济与 UI/模拟逻辑，不使用 `addGold` 作弊。
 
 ## License
 

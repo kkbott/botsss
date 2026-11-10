@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   --ink: #1b2a1f;
   --ink-soft: #33452f;
   --parchment: #f6edda;
@@ -56,6 +57,8 @@ button {
   border: 0;
   cursor: pointer;
   touch-action: manipulation;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 kbd {
@@ -733,7 +736,10 @@ kbd {
 
 .btn-primary {
   color: var(--ink);
-  background: linear-gradient(155deg, #ffd978, var(--gold) 55%, #d9a93d);
+  /* Keep a solid gold fallback: some browser themes/extensions strip
+     background-image on buttons, which previously left this button dark. */
+  background-color: var(--gold);
+  background-image: linear-gradient(155deg, #ffd978, var(--gold) 55%, #d9a93d);
   border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 8px 24px rgba(191, 139, 44, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }

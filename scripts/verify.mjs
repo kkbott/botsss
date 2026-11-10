@@ -149,6 +149,15 @@ try {
   );
   check('start screen and live 3D scene render', await page.locator('#menu-screen').isVisible(), 'menu visible');
   check('HUD is hidden until the run starts', await page.locator('#hud').isHidden(), 'HUD hidden on menu');
+  const startButtonStyle = await page.locator('#btn-start').evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { backgroundColor: style.backgroundColor, backgroundImage: style.backgroundImage, color: style.color, appearance: style.appearance };
+  });
+  check(
+    'start button keeps a visible gold background',
+    startButtonStyle.backgroundColor === 'rgb(243, 196, 85)' && startButtonStyle.backgroundImage.includes('linear-gradient'),
+    JSON.stringify(startButtonStyle),
+  );
 
   await startGame(page);
   let state = await getState(page);

@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-10T12:52:31.246Z",
+  "startedAt": "2026-11-10T13:17:07.540Z",
   "environment": {
     "platform": "darwin",
     "arch": "arm64",
@@ -16,8 +16,8 @@
   "build": {
     "ok": true,
     "exitCode": 0,
-    "durationMs": 308,
-    "outputTail": "> tsc --noEmit && vite build\n\nvite v8.3.7 building client environment for production...\ntransforming...\n✓ 20 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                  13.51 kB │ gzip:   4.13 kB\ndist/assets/index-BE-tFRiN.css   26.78 kB │ gzip:   6.82 kB\ndist/assets/index-BTlBUNrz.js   797.57 kB │ gzip: 209.13 kB\n\n✓ built in 116ms"
+    "durationMs": 359,
+    "outputTail": "computing gzip size...\ndist/index.html                  13.51 kB │ gzip:   4.13 kB\ndist/assets/index-B8n5nLy-.css   26.90 kB │ gzip:   6.87 kB\ndist/assets/index-Bg4FWH-h.js   797.57 kB │ gzip: 209.13 kB\n\n✓ built in 138ms\n\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
   },
   "assets": {
     "loaded": 69,
@@ -55,6 +55,11 @@
       "name": "HUD is hidden until the run starts",
       "ok": true,
       "details": "HUD hidden on menu"
+    },
+    {
+      "name": "start button keeps a visible gold background",
+      "ok": true,
+      "details": "{\"backgroundColor\":\"rgb(243, 196, 85)\",\"backgroundImage\":\"linear-gradient(155deg, rgb(255, 217, 120), rgb(243, 196, 85) 55%, rgb(217, 169, 61))\",\"color\":\"rgb(27, 42, 31)\",\"appearance\":\"none\"}"
     },
     {
       "name": "starting economy is correct",
@@ -154,7 +159,7 @@
     {
       "name": "busy battle field renders near 60 fps",
       "ok": true,
-      "details": "60.1 fps average, p95 17.9 ms, 171 draw calls, 157300 triangles"
+      "details": "60.0 fps average, p95 18.4 ms, 171 draw calls, 157300 triangles"
     },
     {
       "name": "mobile start screen is usable",
@@ -210,10 +215,10 @@
   "consoleErrors": [],
   "fps": {
     "frames": 301,
-    "averageMs": 16.62558139528943,
-    "p95Ms": 17.899999976158142,
-    "fpsAverage": 60.14827248587726,
-    "fpsP95": 55.86592186211996,
+    "averageMs": 16.663787375355877,
+    "p95Ms": 18.400000005960464,
+    "fpsAverage": 60.01036723973704,
+    "fpsP95": 54.34782606935118,
     "metrics": {
       "fps": 60,
       "calls": 171,
@@ -223,16 +228,16 @@
       "height": 900,
       "camera": {
         "position": [
-          16.196854985553575,
-          22.5,
-          26.50202267310208
+          16.19664896687429,
+          22.499999999999986,
+          26.502155349789305
         ],
         "target": [
           -0.09999999999999999,
           0.3,
           1.4
         ],
-        "distance": 37.263105408716186
+        "distance": 37.263104684855236
       }
     }
   },
@@ -245,7 +250,7 @@
     "kills": 104,
     "leaks": 1,
     "harvestedGold": 1200,
-    "simulatedSeconds": 199,
+    "simulatedSeconds": 198,
     "towers": [
       {
         "id": "arrow",
@@ -313,21 +318,21 @@
         "star": 6
       },
       {
-        "t": 119,
+        "t": 118,
         "wave": 4,
         "lives": 18,
-        "gold": 110,
-        "star": 8
+        "gold": 135,
+        "star": 9
       },
       {
-        "t": 151,
+        "t": 150,
         "wave": 5,
         "lives": 18,
         "gold": 158,
         "star": 7
       },
       {
-        "t": 181,
+        "t": 180,
         "wave": 6,
         "lives": 18,
         "gold": 158,
@@ -341,11 +346,11 @@
     "docs/screenshots/after-mobile-menu.png",
     "docs/screenshots/after-mobile-game.png"
   ],
-  "finishedAt": "2026-11-10T12:52:53.705Z",
+  "finishedAt": "2026-11-10T13:17:30.331Z",
   "passed": true,
   "summary": {
-    "total": 36,
-    "passed": 36,
+    "total": 37,
+    "passed": 37,
     "failed": 0
   }
 }
