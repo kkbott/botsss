@@ -310,7 +310,8 @@
       const group = `<div class="marquee-group">${marqueeItems
         .map((item) => `<span class="marquee-item">${esc(item)}</span>`)
         .join('')}</div>`;
-      marqueeTrack.innerHTML = group + group;
+      // 多复制几份，保证宽屏下滚动时右侧也不会出现空白；动画只移动一份的宽度。
+      marqueeTrack.innerHTML = group.repeat(10);
     } else {
       const marquee = marqueeTrack.closest('.marquee');
       if (marquee) marquee.hidden = true;

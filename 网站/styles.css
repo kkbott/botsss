@@ -801,7 +801,7 @@ ul {
 
 @keyframes marquee-scroll {
   to {
-    transform: translateX(-50%);
+    transform: translateX(-10%);
   }
 }
 
