@@ -45,8 +45,8 @@ window.SITE_CONTENT = {
   contact: {
     headline: "有想法，随时聊聊。",
     note: "欢迎交流合作，或者只是来打个招呼。",
-    // TODO: 换成你的邮箱（同时会生成 mailto: 链接）
-    email: "hello@example.com",
+    // 已填写：kkbbot@163.com；以后要换直接改这里即可
+    email: "kkbbot@163.com",
     // TODO: 换成你的个人主页（没有可留空，按钮会自动隐藏）
     github: "https://github.com/kkbott",
     githubLabel: "@kkbott",

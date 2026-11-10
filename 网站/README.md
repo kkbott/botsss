@@ -13,10 +13,9 @@
 | `tagline` | 一句话介绍你自己…… | 首页的大标题下方的那句话 |
 | `about.lead` | 你好，我是「你的名字」。 | 关于我区块的开头 |
 | `about.paragraphs` | 两段占位介绍 | 换成你的自我介绍，可以是一段或多段 |
-| `contact.email` | `hello@example.com` | 会同时生成 `mailto:` 邮件链接 |
 | `contact.github` | `https://github.com/kkbott` | 你的个人主页；留空则隐藏该入口 |
 
-`about.tools`（工具标签）和 `about.facts`（右侧小档案）也建议按实际情况改一下。
+`contact.email` 已经填好为 `kkbbot@163.com`，以后要换直接改这一项；它会同步生成 `mailto:` 链接。`about.tools`（工具标签）和 `about.facts`（右侧小档案）也建议按实际情况改一下。
 
 ## 改字的规则
 

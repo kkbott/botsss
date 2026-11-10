@@ -10,6 +10,8 @@
 | `after-root-mobile.jpg` | 本次改动在手机 390 × 844 下访问根路径：个人作品集首页 |
 | `after-full-page-desktop.jpg` | 本次改动的桌面整页（作品、关于、联系） |
 | `after-game-playing.jpg` | 从首页点击「游玩《穗守》」打开 `/game/` 并开始游戏后的画面 |
+| `before-contact-desktop.jpg` | 联系邮箱更新前（占位 `hello@example.com`）的联系区 |
+| `after-contact-desktop.jpg` | 联系邮箱更新为 `kkbbot@163.com` 后的联系区 |
 
 所有截图都由 Playwright 驱动真实 Chromium 渲染生成：macOS arm64、headless Chromium、Metal GPU、桌面 1440 × 900 / 手机 390 × 844、`deviceScaleFactor: 1`。
 
