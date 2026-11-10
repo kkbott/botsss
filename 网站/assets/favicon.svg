@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="麦穗标记">
+  <rect width="64" height="64" rx="15" fill="#2c4534" />
+  <path
+    d="M32 51V15M32 27c-8.4 0-13.2-4.8-14.4-11.2M32 39c-9.6 0-15.6-6-16.8-13.6M32 27c8.4 0 13.2-4.8 14.4-11.2M32 39c9.6 0 15.6-6 16.8-13.6"
+    fill="none"
+    stroke="#e7d0a0"
+    stroke-width="3.2"
+    stroke-linecap="round"
+  />
+</svg>
