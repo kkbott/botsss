@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-10T11:53:29.272Z",
+  "startedAt": "2026-11-10T12:52:31.246Z",
   "environment": {
     "platform": "darwin",
     "arch": "arm64",
@@ -16,8 +16,8 @@
   "build": {
     "ok": true,
     "exitCode": 0,
-    "durationMs": 292,
-    "outputTail": "computing gzip size...\ndist/index.html                  13.51 kB │ gzip:   4.13 kB\ndist/assets/index-BE-tFRiN.css   26.78 kB │ gzip:   6.82 kB\ndist/assets/index-BX0orlFQ.js   797.24 kB │ gzip: 209.01 kB\n\n✓ built in 106ms\n\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
+    "durationMs": 308,
+    "outputTail": "> tsc --noEmit && vite build\n\nvite v8.3.7 building client environment for production...\ntransforming...\n✓ 20 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                  13.51 kB │ gzip:   4.13 kB\ndist/assets/index-BE-tFRiN.css   26.78 kB │ gzip:   6.82 kB\ndist/assets/index-BTlBUNrz.js   797.57 kB │ gzip: 209.13 kB\n\n✓ built in 116ms"
   },
   "assets": {
     "loaded": 69,
@@ -122,6 +122,11 @@
       "details": "playing"
     },
     {
+      "name": "enemy models face along their movement direction",
+      "ok": true,
+      "details": "facing dots 1.00, 1.00, 1.00, 1.00, 1.00, 1.00"
+    },
+    {
       "name": "enemies leak, cost lives and scorch a crop",
       "ok": true,
       "details": "lives 8, leaks 6"
@@ -144,12 +149,12 @@
     {
       "name": "the winning run used crops and tower upgrades end-to-end",
       "ok": true,
-      "details": "6 towers, harvested 1216 gold"
+      "details": "6 towers, harvested 1200 gold"
     },
     {
       "name": "busy battle field renders near 60 fps",
       "ok": true,
-      "details": "60.1 fps average, p95 18.1 ms, 171 draw calls, 157300 triangles"
+      "details": "60.1 fps average, p95 17.9 ms, 171 draw calls, 157300 triangles"
     },
     {
       "name": "mobile start screen is usable",
@@ -205,12 +210,12 @@
   "consoleErrors": [],
   "fps": {
     "frames": 301,
-    "averageMs": 16.650166112917205,
-    "p95Ms": 18.099999994039536,
-    "fpsAverage": 60.059460861726755,
-    "fpsP95": 55.24861880272417,
+    "averageMs": 16.62558139528943,
+    "p95Ms": 17.899999976158142,
+    "fpsAverage": 60.14827248587726,
+    "fpsP95": 55.86592186211996,
     "metrics": {
-      "fps": 60.00774293457216,
+      "fps": 60,
       "calls": 171,
       "triangles": 157300,
       "pixelRatio": 1,
@@ -218,16 +223,16 @@
       "height": 900,
       "camera": {
         "position": [
-          16.19687158383951,
-          22.499999999999996,
-          26.50201224320715
+          16.196854985553575,
+          22.5,
+          26.50202267310208
         ],
         "target": [
           -0.09999999999999999,
           0.3,
           1.4
         ],
-        "distance": 37.26310564188494
+        "distance": 37.263105408716186
       }
     }
   },
@@ -235,11 +240,11 @@
     "outcome": "victory",
     "wave": 6,
     "lives": 18,
-    "gold": 188,
+    "gold": 198,
     "star": 8,
     "kills": 104,
     "leaks": 1,
-    "harvestedGold": 1216,
+    "harvestedGold": 1200,
     "simulatedSeconds": 199,
     "towers": [
       {
@@ -297,35 +302,35 @@
         "t": 60,
         "wave": 2,
         "lives": 18,
-        "gold": 79,
+        "gold": 89,
         "star": 4
       },
       {
         "t": 87,
         "wave": 3,
         "lives": 18,
-        "gold": 44,
+        "gold": 54,
         "star": 6
       },
       {
         "t": 119,
         "wave": 4,
         "lives": 18,
-        "gold": 155,
-        "star": 9
+        "gold": 110,
+        "star": 8
       },
       {
         "t": 151,
         "wave": 5,
         "lives": 18,
-        "gold": 148,
+        "gold": 158,
         "star": 7
       },
       {
         "t": 181,
         "wave": 6,
         "lives": 18,
-        "gold": 148,
+        "gold": 158,
         "star": 8
       }
     ]
@@ -336,11 +341,11 @@
     "docs/screenshots/after-mobile-menu.png",
     "docs/screenshots/after-mobile-game.png"
   ],
-  "finishedAt": "2026-11-10T11:53:51.748Z",
+  "finishedAt": "2026-11-10T12:52:53.705Z",
   "passed": true,
   "summary": {
-    "total": 35,
-    "passed": 35,
+    "total": 36,
+    "passed": 36,
     "failed": 0
   }
 }

@@ -259,7 +259,15 @@ try {
   await startGame(leak.page);
   await leak.page.evaluate(() => window.__fieldguard.plant(0, 'wheat'));
   await leak.page.evaluate(() => window.__fieldguard.nextWave());
-  await leak.page.evaluate(() => window.__fieldguard.simulate(30));
+  await leak.page.evaluate(() => window.__fieldguard.simulate(6));
+  state = await getState(leak.page);
+  const facings = state.enemies.map((enemy) => enemy.facing).filter((value) => typeof value === 'number');
+  check(
+    'enemy models face along their movement direction',
+    facings.length > 0 && facings.every((value) => value > 0.3),
+    `facing dots ${facings.map((value) => value.toFixed(2)).join(', ')}`,
+  );
+  await leak.page.evaluate(() => window.__fieldguard.simulate(24));
   state = await getState(leak.page);
   check('enemies leak, cost lives and scorch a crop', state.phase === 'playing' && state.lives < 20 && state.plots[0].scorched, `lives ${state.lives}, leaks ${state.stats.leaks}`);
   const goldBeforeRepair = state.gold;

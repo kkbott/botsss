@@ -18,7 +18,7 @@
 
 两对截图都是 **1440 × 900**，同一场景状态：8 块作物、3 座防御塔（风语箭塔 Lv.2 / 南瓜炮台 / 风语箭塔）、第 2 波交战、20 生命。基线图来自 commit `80abc1f`；当前图来自本次 PR 的最新提交。
 
-更多截图：`docs/screenshots/after-victory.png`（胜利）、`after-mobile-game.png`（手机游玩）、`after-mobile-menu.png`（手机菜单）、`after-defeat.png`（失败）。
+更多截图：`docs/screenshots/after-victory.png`（胜利）、`after-mobile-game.png`（手机游玩）、`after-mobile-menu.png`（手机菜单）、`after-defeat.png`（失败）、`enemy-facing-closeup.png` / `enemy-facing-topdown.png`（怪物朝向修复后的近景与俯视）。
 
 ## 快速开始
 
@@ -82,9 +82,10 @@ npm run preview    # 本地预览生产构建（4173）
 | `npm run build`（类型检查 + 静态构建） | ✅ 退出码 0 |
 | 外部 GLB 资产加载 | ✅ 69 / 69，0 错误 |
 | 浏览器控制台异常 / 未处理页面错误 | ✅ 0 |
-| 帧率（5 秒实测，繁忙交战场景） | ✅ 平均 **60.1 fps**，P95 帧时间 **18.1 ms**；171 draw calls / 157,300 triangles；另有 headed Chromium 实测平均 59.8 fps |
-| 种田 → 金币 → 建塔 → 抵御 6 波 → 再投资 | ✅ 自动玩家以正常初始经济打赢 6 波：18 生命、104 击杀、6 座塔、收获 1216 金币 |
+| 帧率（5 秒实测，繁忙交战场景） | ✅ 平均 **60.1 fps**，P95 帧时间 **17.9 ms**；171 draw calls / 157,300 triangles；另有 headed Chromium 实测平均 59.8 fps |
+| 种田 → 金币 → 建塔 → 抵御 6 波 → 再投资 | ✅ 自动玩家以正常初始经济打赢 6 波：18 生命、104 击杀、6 座塔、收获 1200 金币 |
 | 交互验收 | ✅ 点击播种、拖动连播、点击收获、开垦、建塔、升级、拆除、相机旋转/缩放、暂停/帮助、失败与胜利界面 |
+| 怪物模型朝向 | ✅ 模型头部朝向与路径切线一致；自动化回归检查记录 6 / 6 个敌人 facing dot ≈ 1.00 |
 | 漏怪 / 焦土 | ✅ 漏怪扣生命并烧毁农田；14 金币修复焦土 |
 | 移动端（390 × 844） | ✅ 无页面横向溢出；触屏播种可用；底栏操作可见 |
 | 所有外部素材许可证 | ✅ 仅 CC0（Kenney Nature Kit 2.1、Quaternius 五个包），证据与逐项清单见 [`CREDITS.md`](CREDITS.md) 和 [`public/assets/quaternius/LICENSE-EVIDENCE.md`](public/assets/quaternius/LICENSE-EVIDENCE.md) |
@@ -159,7 +160,7 @@ npm run verify          # 构建、启动生产预览并执行完整验收
 npm run screenshots     # 生成 docs/screenshots/after-*.png
 ```
 
-`npm run verify` 会运行 35 项检查并更新 `docs/verification.json`；需要先安装 Playwright Chromium。脚本中的自动游玩使用正常经济与 UI/模拟逻辑，不使用 `addGold` 作弊。
+`npm run verify` 会运行 36 项检查并更新 `docs/verification.json`；需要先安装 Playwright Chromium。脚本中的自动游玩使用正常经济与 UI/模拟逻辑，不使用 `addGold` 作弊。
 
 ## License
 

@@ -418,8 +418,9 @@ export class AssetArt implements ArtProvider {
       const scene = skeletonClone(loaded.scene) as Group;
       tintMaterials(scene, def.tint, def.boss ? 0.26 : 0.18, def.boss ? 0.1 : 0);
       const wrapper = normalizeModel(scene, { height: def.height, center: true, ground: true });
-      // The Quaternius animal rigs face -Z; turn them toward +Z to match the path tangent.
-      wrapper.rotation.y = Math.PI;
+      // Quaternius animal rigs are authored head-toward +Z, which is the same
+      // convention as the path tangent calculation in Game.updateEnemies().
+      wrapper.rotation.y = 0;
       this.enemyTemplates.set(type, wrapper);
       this.enemyClips.set(type, loaded.animations);
     }
@@ -516,6 +517,7 @@ export class AssetArt implements ArtProvider {
       legs: [],
       phase: Math.random() * Math.PI * 2,
       mixer,
+      head: visual.getObjectByName('Head') ?? visual.getObjectByName('head') ?? undefined,
     };
   }
 }

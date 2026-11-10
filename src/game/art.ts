@@ -18,6 +18,7 @@ export interface EnemyArt {
   legs: Object3D[];
   phase: number;
   mixer: AnimationMixer | null;
+  head?: Object3D;
 }
 
 export interface ArtProvider {

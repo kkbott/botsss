@@ -918,6 +918,7 @@ export class Game {
     group.userData.phase = Math.random() * Math.PI * 2;
     group.userData.legs = art.legs;
     group.userData.visual = art.visual;
+    group.userData.head = art.head ?? null;
     this.world.scene.add(group);
     if (!def.boss) {
       const aura = new Mesh(
@@ -1813,11 +1814,24 @@ export class Game {
           prepRemaining: game.prepRemaining,
           speed: game.speed,
           selectedTool: game.selectedTool,
-          enemies: game.enemies.map((enemy) => ({
-            id: enemy.id,
-            hp: enemy.hp,
-            progress: enemy.progress,
-          })),
+          enemies: game.enemies.map((enemy) => {
+            const tangent = game.world.path.curve.getTangentAt(Math.min(0.9999, enemy.progress));
+            const head = enemy.group.userData.head as Object3D | null;
+            let facing: number | null = null;
+            if (head) {
+              const headWorld = head.getWorldPosition(new Vector3());
+              const dx = headWorld.x - enemy.group.position.x;
+              const dz = headWorld.z - enemy.group.position.z;
+              const length = Math.hypot(dx, dz);
+              if (length > 0.0001) facing = (dx * tangent.x + dz * tangent.z) / length;
+            }
+            return {
+              id: enemy.id,
+              hp: enemy.hp,
+              progress: enemy.progress,
+              facing,
+            };
+          }),
           plots: game.plots.map((plot) => ({
             index: plot.spec.index,
             unlocked: plot.unlocked,
