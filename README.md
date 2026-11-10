@@ -20,6 +20,12 @@
 
 更多截图：`docs/screenshots/after-victory.png`（胜利）、`after-mobile-game.png`（手机游玩）、`after-mobile-menu.png`（手机菜单）、`after-defeat.png`（失败）、`enemy-facing-closeup.png` / `enemy-facing-topdown.png`（怪物朝向修复后的近景与俯视）。
 
+### Issue #1 反馈修复对比
+
+![怪物朝向与开始按钮的修改前后对比](docs/screenshots/fix-before-after.png)
+
+左：旧版 `96b2200`（怪物尾巴朝前、按钮在渐变被剥离后变黑）；右：当前 PR head `90ff6e7`。怪物为真实游戏截图；按钮在两侧使用相同的“移除渐变背景”条件复现主题/扩展行为。
+
 ## 快速开始
 
 需要 Node.js `^20.19.0 || >=22.12.0`。
