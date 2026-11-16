@@ -94,6 +94,11 @@ async function startGame(page) {
   await page.waitForFunction(() => window.__fieldguard.getState().phase === 'playing', null, { timeout: 5000 });
 }
 
+async function startVersus(page) {
+  await page.locator('#btn-versus').click();
+  await page.waitForFunction(() => window.__fieldguard.getState().phase === 'playing', null, { timeout: 5000 });
+}
+
 async function pressE(page) {
   await page.keyboard.press('KeyE');
   await page.waitForTimeout(180);
@@ -607,6 +612,241 @@ try {
   );
   await perf.context.close();
 
+  /* ── 11b. Versus season: mode, merge, blessings, shop, duel ─────── */
+  const duel = await openPage(browser, { width: 1440, height: 900 });
+  await startVersus(duel.page);
+  await duel.page.evaluate(() => window.__fieldguard.hold());
+  state = await getState(duel.page);
+  check(
+    'versus mode starts with eight waves, twelve lives and a rival',
+    state.runMode === 'versus' && state.totalWaves === 8 && state.lives === 12 && state.maxLives === 12 && !!state.rival,
+    `${state.runMode}, ${state.lives} lives, rival ${state.rival?.name}`,
+  );
+  check(
+    'the duel HUD names the rival and shows both life totals',
+    (await duel.page.locator('#duel-panel').isVisible()) &&
+      (await duel.page.locator('#duel-rival-name').textContent()).length > 0,
+    await duel.page.locator('#duel-panel').innerText(),
+  );
+
+  await duel.page.evaluate(() => {
+    window.__fieldguard.addGold(520);
+    window.__fieldguard.addStar(6);
+    window.__fieldguard.build(18, 'arrow');
+    window.__fieldguard.build(19, 'arrow');
+    window.__fieldguard.selectTowerAt(18);
+  });
+  await duel.page.waitForTimeout(200);
+  check(
+    'two adjacent same-level towers expose a merge action',
+    (await duel.page.locator('#inspector').isVisible()) &&
+      !(await duel.page.locator('#btn-merge').isDisabled()) &&
+      /合成 Lv\.2/.test((await duel.page.locator('#btn-merge').textContent()) ?? ''),
+    await duel.page.locator('#btn-merge').textContent(),
+  );
+  await duel.page.locator('#btn-merge').click();
+  await duel.page.waitForTimeout(200);
+  state = await getState(duel.page);
+  check(
+    'merging consumes the adjacent tower, upgrades the selected one and frees its land',
+    state.towers.length === 1 &&
+      state.towers[0].plot === 18 &&
+      state.towers[0].level === 2 &&
+      state.plots[19].state === 'wild' &&
+      state.stats.merges === 1,
+    JSON.stringify({ towers: state.towers, plot19: state.plots[19].state, merges: state.stats.merges }),
+  );
+
+  // Strong enough to clear waves 1-2 while exercising the intermission flow.
+  await duel.page.evaluate(() => {
+    window.__fieldguard.addGold(1000);
+    window.__fieldguard.addStar(10);
+    for (const plot of [0, 2, 5, 6, 12, 13, 20, 21]) window.__fieldguard.build(plot, 'arrow');
+  });
+  await duel.page.evaluate(() => {
+    window.__fieldguard.nextWave();
+    window.__fieldguard.simulate(90);
+  });
+  state = await getState(duel.page);
+  check(
+    'clearing a versus wave opens the three-choice blessing screen',
+    state.phase === 'blessing' &&
+      state.blessingOffers.length === 3 &&
+      (await duel.page.locator('#blessing-screen').isVisible()) &&
+      (await duel.page.locator('.blessing-card').count()) === 3,
+    `${state.phase}, offers ${state.blessingOffers.map((offer) => offer.id).join(',')}`,
+  );
+  const blessingId = state.blessingOffers[0].id;
+  await duel.page.locator(`[data-blessing="${blessingId}"]`).click();
+  await duel.page.waitForTimeout(200);
+  state = await getState(duel.page);
+  check(
+    'choosing a blessing adds a stack and resumes the run',
+    state.phase === 'playing' && state.blessings[blessingId] === 1 && state.stats.blessings === 1,
+    `${blessingId} ×${state.blessings[blessingId]}, phase ${state.phase}`,
+  );
+  check(
+    'the blessing bar shows the chosen season',
+    (await duel.page.locator('#blessing-bar').isVisible()) &&
+      (await duel.page.locator('.blessing-chip').count()) >= 1,
+    await duel.page.locator('#blessing-bar').innerText(),
+  );
+
+  await duel.page.evaluate(() => {
+    window.__fieldguard.nextWave();
+    window.__fieldguard.simulate(100);
+  });
+  state = await getState(duel.page);
+  if (state.phase === 'blessing') {
+    const id = state.blessingOffers[0].id;
+    await duel.page.locator(`[data-blessing="${id}"]`).click();
+    await duel.page.waitForTimeout(200);
+    state = await getState(duel.page);
+  }
+  check(
+    'the merchant visits after the second versus wave',
+    state.phase === 'shop' &&
+      state.shopOffers.length >= 3 &&
+      (await duel.page.locator('#shop-screen').isVisible()) &&
+      (await duel.page.locator('.shop-card').count()) >= 3,
+    `${state.phase}, offers ${state.shopOffers.map((offer) => offer.id).join(',')}`,
+  );
+  check(
+    'the rival takes leaks as the duel progresses',
+    !!state.rival && state.rival.lives < state.rival.maxLives,
+    `rival ${state.rival?.lives}/${state.rival?.maxLives}`,
+  );
+  if (state.phase === 'shop') {
+    const buys = state.shopOffers.filter((offer) => !offer.sold && offer.price <= state.gold).slice(0, 2);
+    for (const offer of buys) {
+      await duel.page.locator(`[data-shop="${offer.id}"]`).click();
+      await duel.page.waitForTimeout(150);
+    }
+    state = await getState(duel.page);
+    check(
+      'the merchant limits a visit to two purchases',
+      state.shopPurchases === Math.min(2, buys.length) &&
+        state.shopOffers.every((offer) => offer.sold || offer.price > state.gold || state.shopPurchases >= 2),
+      `purchases ${state.shopPurchases}, gold ${Math.round(state.gold)}`,
+    );
+    const rerollCost = state.shopRerollCost;
+    const goldBeforeReroll = state.gold;
+    const reroll = await duel.page.locator('#btn-shop-reroll');
+    if (!(await reroll.isDisabled())) {
+      await reroll.click();
+      await duel.page.waitForTimeout(150);
+      state = await getState(duel.page);
+      check(
+        'rerolling the merchant costs gold and refreshes the offers',
+        state.gold === goldBeforeReroll - rerollCost && state.shopRerolls >= 1,
+        `gold ${goldBeforeReroll} → ${state.gold}, rerolls ${state.shopRerolls}`,
+      );
+    }
+    await duel.page.locator('#btn-shop-close').click();
+    await duel.page.waitForTimeout(200);
+    state = await getState(duel.page);
+    check('closing the merchant resumes the run', state.phase === 'playing', state.phase);
+  }
+  await duel.context.close();
+
+  // Full eight-wave versus run with a deliberately strong debug setup. This
+  // checks the state machine and end screen, not the economy balance.
+  const duelRun = await openPage(browser, { width: 1440, height: 900 });
+  await startVersus(duelRun.page);
+  await duelRun.page.evaluate(() => {
+    window.__fieldguard.addGold(5000);
+    window.__fieldguard.addStar(60);
+    const towers = [0, 1, 18, 19, 2, 3, 12, 13, 5, 11, 6, 22, 4, 17];
+    for (const plot of towers) window.__fieldguard.build(plot, 'arrow');
+    for (const plot of [0, 18, 2, 12, 5, 6, 4]) {
+      if (window.__fieldguard.canMerge(plot)) window.__fieldguard.merge(plot);
+    }
+    for (const tower of window.__fieldguard.getState().towers) {
+      if (tower.level < 3) window.__fieldguard.upgrade(tower.plot);
+      if (tower.level < 3) window.__fieldguard.upgrade(tower.plot);
+    }
+  });
+  const duelResult = await duelRun.page.evaluate(async () => {
+    const api = window.__fieldguard;
+    for (let i = 0; i < 1200; i++) {
+      const current = api.getState();
+      if (current.phase === 'victory' || current.phase === 'defeat') {
+        return {
+          phase: current.phase,
+          wave: current.wave,
+          lives: current.lives,
+          maxLives: current.maxLives,
+          rivalLives: current.rival?.lives ?? null,
+          blessings: current.stats.blessings,
+          merges: current.stats.merges,
+          totalWaves: current.totalWaves,
+        };
+      }
+      if (current.phase === 'blessing') {
+        api.chooseBlessing(current.blessingOffers[0].id);
+        continue;
+      }
+      if (current.phase === 'shop') {
+        for (const offer of current.shopOffers) {
+          if (!offer.sold && offer.price <= api.getState().gold) {
+            api.buyShopItem(offer.id);
+            break;
+          }
+        }
+        api.closeShop();
+        continue;
+      }
+      api.simulate(2);
+    }
+    const final = api.getState();
+    return { phase: final.phase, wave: final.wave, lives: final.lives, maxLives: final.maxLives, rivalLives: final.rival?.lives ?? null, blessings: final.stats.blessings, merges: final.stats.merges, totalWaves: final.totalWaves };
+  });
+  check(
+    'a versus run reaches a win or loss after the eight-wave state machine',
+    (duelResult.phase === 'victory' || duelResult.phase === 'defeat') &&
+      duelResult.totalWaves === 8 &&
+      duelResult.blessings >= 1 &&
+      duelResult.merges >= 1,
+    JSON.stringify(duelResult),
+  );
+  if (duelResult.phase === 'victory') {
+    check(
+      'the versus victory end screen reports the duel outcome',
+      (await duelRun.page.locator('#end-screen').isVisible()) &&
+        /对垒|对手/.test((await duelRun.page.locator('#end-title').textContent()) ?? ''),
+      await duelRun.page.locator('#end-title').textContent(),
+    );
+  }
+  await duelRun.context.close();
+
+  // Defeat path: no towers, let the eight waves through.
+  const duelDefeat = await openPage(browser, { width: 1280, height: 800 });
+  await startVersus(duelDefeat.page);
+  const duelDefeatPhase = await duelDefeat.page.evaluate(async () => {
+    const api = window.__fieldguard;
+    for (let i = 0; i < 60; i++) {
+      const current = api.getState();
+      if (current.phase === 'defeat' || current.phase === 'victory') return current.phase;
+      if (current.phase === 'blessing') {
+        api.chooseBlessing(current.blessingOffers[0].id);
+        continue;
+      }
+      if (current.phase === 'shop') {
+        api.closeShop();
+        continue;
+      }
+      api.simulate(120);
+    }
+    return api.getState().phase;
+  });
+  state = await getState(duelDefeat.page);
+  check(
+    'versus mode can end in defeat when the player loses all lives',
+    duelDefeatPhase === 'defeat' && state.phase === 'defeat' && (await duelDefeat.page.locator('#end-screen').isVisible()),
+    `${duelDefeatPhase}, lives ${state.lives}, rival ${state.rival?.lives}`,
+  );
+  await duelDefeat.context.close();
+
   /* ── 12. Mobile first-person touch controls ──────────────────────── */
   const mobileContext = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -621,6 +861,11 @@ try {
   await mobile.screenshot({ path: path.join(root, 'docs/screenshots/after-mobile-menu.png') });
   recordScreenshot('docs/screenshots/after-mobile-menu.png');
   check('mobile start screen is usable', await mobile.locator('#btn-start').isVisible(), '390×844');
+  check(
+    'mobile menu exposes both classic and versus modes',
+    (await mobile.locator('#btn-start').isVisible()) && (await mobile.locator('#btn-versus').isVisible()),
+    '390×844 mode cards',
+  );
   await mobile.locator('#btn-start').tap();
   await mobile.waitForFunction(() => window.__fieldguard.getState().phase === 'playing', null, { timeout: 5000 });
   await mobile.waitForTimeout(300);
@@ -677,6 +922,65 @@ try {
   await mobile.screenshot({ path: path.join(root, 'docs/screenshots/after-mobile-game.png') });
   recordScreenshot('docs/screenshots/after-mobile-game.png');
   await mobileContext.close();
+
+  /* ── 12b. Mobile versus HUD and blessing modal ──────────────────── */
+  const mobileDuelContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+  });
+  const mobileDuel = await mobileDuelContext.newPage();
+  wirePage(mobileDuel);
+  await mobileDuel.goto(`${baseUrl}/?debug=1`, { waitUntil: 'networkidle' });
+  await waitForGame(mobileDuel);
+  await mobileDuel.locator('#btn-versus').tap();
+  await mobileDuel.waitForFunction(() => window.__fieldguard.getState().phase === 'playing', null, { timeout: 5000 });
+  await mobileDuel.waitForTimeout(300);
+  const mobileDuelLayout = await mobileDuel.evaluate(() => {
+    const rect = document.getElementById('duel-panel').getBoundingClientRect();
+    return {
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+      visible: !document.getElementById('duel-panel').hidden,
+      duel: { x: rect.x, y: rect.y, w: rect.width, h: rect.height, right: rect.right, bottom: rect.bottom },
+    };
+  });
+  check(
+    'mobile versus HUD fits without horizontal overflow',
+    mobileDuelLayout.visible &&
+      mobileDuelLayout.documentWidth <= mobileDuelLayout.viewportWidth + 1 &&
+      mobileDuelLayout.duel.x >= 0 &&
+      mobileDuelLayout.duel.right <= mobileDuelLayout.viewportWidth + 1,
+    JSON.stringify(mobileDuelLayout),
+  );
+  await mobileDuel.evaluate(() => {
+    window.__fieldguard.addGold(900);
+    window.__fieldguard.addStar(8);
+    for (const plot of [0, 2, 5, 6, 12, 13]) window.__fieldguard.build(plot, 'arrow');
+    window.__fieldguard.nextWave();
+    window.__fieldguard.simulate(95);
+  });
+  await mobileDuel.waitForTimeout(250);
+  const mobileBlessing = await mobileDuel.evaluate(() => ({
+    phase: window.__fieldguard.getState().phase,
+    cards: document.querySelectorAll('.blessing-card').length,
+    modal: document.querySelector('.modal-intermission')?.getBoundingClientRect().toJSON() ?? null,
+    documentWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+  }));
+  check(
+    'mobile blessing modal stacks three readable cards without overflow',
+    mobileBlessing.phase === 'blessing' &&
+      mobileBlessing.cards === 3 &&
+      mobileBlessing.modal &&
+      mobileBlessing.modal.right <= mobileBlessing.viewportWidth + 1 &&
+      mobileBlessing.documentWidth <= mobileBlessing.viewportWidth + 1,
+    JSON.stringify(mobileBlessing),
+  );
+  await mobileDuel.screenshot({ path: path.join(root, 'docs/screenshots/after-mobile-versus.png') });
+  recordScreenshot('docs/screenshots/after-mobile-versus.png');
+  await mobileDuelContext.close();
 
   /* ── 13. Licence evidence ─────────────────────────────────────────── */
   const kenneyLicense = fs.readFileSync(path.join(root, 'public/assets/kenney/License.txt'), 'utf8');

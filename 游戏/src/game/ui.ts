@@ -1,8 +1,17 @@
 import { CROPS, ENEMIES, RULES, TOWERS, WORLD } from './config';
-import type { CameraMode, CropId, TowerId } from './types';
+import type {
+  BlessingChoice,
+  CameraMode,
+  CropId,
+  RivalState,
+  RunMode,
+  ShopOffer,
+  TowerId,
+} from './types';
 
 export interface UIActions {
   start: () => void;
+  startVersus: () => void;
   resume: () => void;
   restart: () => void;
   quitToMenu: () => void;
@@ -16,8 +25,13 @@ export interface UIActions {
   toggleSound: () => void;
   showHelp: () => void;
   upgradeTower: () => void;
+  mergeTower: () => void;
   sellTower: () => void;
   closeInspector: () => void;
+  chooseBlessing: (id: string) => void;
+  buyShopItem: (id: string) => void;
+  rerollShop: () => void;
+  closeShop: () => void;
   retry: () => void;
 }
 
@@ -29,6 +43,8 @@ export interface InspectorData {
   note: string;
   upgradeLabel: string;
   upgradeEnabled: boolean;
+  mergeLabel: string;
+  mergeEnabled: boolean;
   sellLabel: string;
   sellEnabled: boolean;
 }
@@ -46,6 +62,8 @@ export interface WaveHud {
 
 export interface EndData {
   victory: boolean;
+  mode: RunMode;
+  reason: 'cleared' | 'lives' | 'rival' | 'compare';
   wave: number;
   total: number;
   kills: number;
@@ -53,6 +71,12 @@ export interface EndData {
   towersBuilt: number;
   seconds: number;
   record: string;
+  lives: number;
+  maxLives: number;
+  blessings: number;
+  merges: number;
+  rivalName?: string;
+  rivalLives?: number;
 }
 
 export interface InteractPrompt {
@@ -120,6 +144,22 @@ export class GameUI {
   private readonly speedBtn = el('btn-speed');
   private readonly cameraBtn = el('btn-camera');
   private readonly menuBest = el('menu-best');
+  private readonly menuVersusBest = el('menu-versus-best');
+  private readonly duelPanel = el('duel-panel');
+  private readonly duelYourLives = el('duel-your-lives');
+  private readonly duelRivalLives = el('duel-rival-lives');
+  private readonly duelRivalName = el('duel-rival-name');
+  private readonly duelRivalWave = el('duel-rival-wave');
+  private readonly blessingBar = el('blessing-bar');
+  private readonly blessingScreen = el('blessing-screen');
+  private readonly blessingCards = el('blessing-cards');
+  private readonly blessingLead = el('blessing-lead');
+  private readonly blessingProgress = el('blessing-progress');
+  private readonly shopScreen = el('shop-screen');
+  private readonly shopCards = el('shop-cards');
+  private readonly shopLead = el('shop-lead');
+  private readonly shopReroll = el<HTMLButtonElement>('btn-shop-reroll');
+  private readonly shopClose = el<HTMLButtonElement>('btn-shop-close');
   private readonly crosshair = el('crosshair');
   private readonly interactPrompt = el('interact-prompt');
   private readonly interactKey = el('interact-key');
@@ -141,6 +181,7 @@ export class GameUI {
   private lastLockHintVisible: boolean | null = null;
   private lastTouchVisible: boolean | null = null;
   private lastCameraMode: CameraMode | null = null;
+  private lastBlessingKey = '';
   onHelpClosed: (() => void) | null = null;
 
   constructor(actions: UIActions) {
@@ -148,6 +189,7 @@ export class GameUI {
     this.contextCards = Array.from(document.querySelectorAll<HTMLButtonElement>('.tool-card'));
 
     el('btn-start').addEventListener('click', () => this.actions.start());
+    el('btn-versus').addEventListener('click', () => this.actions.startVersus());
     el('btn-howto').addEventListener('click', () => this.actions.showHelp());
     el('btn-help').addEventListener('click', () => this.actions.showHelp());
     el('btn-pause').addEventListener('click', () => this.actions.togglePause());
@@ -162,7 +204,20 @@ export class GameUI {
     el('btn-back-menu').addEventListener('click', () => this.actions.quitToMenu());
     el('btn-inspector-close').addEventListener('click', () => this.actions.closeInspector());
     el('btn-upgrade').addEventListener('click', () => this.actions.upgradeTower());
+    el('btn-merge').addEventListener('click', () => this.actions.mergeTower());
     el('btn-sell').addEventListener('click', () => this.actions.sellTower());
+    this.shopReroll.addEventListener('click', () => this.actions.rerollShop());
+    this.shopClose.addEventListener('click', () => this.actions.closeShop());
+    this.blessingCards.addEventListener('click', (event) => {
+      const target = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-blessing]');
+      if (!target || target.disabled) return;
+      this.actions.chooseBlessing(target.dataset.blessing ?? '');
+    });
+    this.shopCards.addEventListener('click', (event) => {
+      const target = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-shop]');
+      if (!target || target.disabled) return;
+      this.actions.buyShopItem(target.dataset.shop ?? '');
+    });
     el('btn-interact').addEventListener('click', () => this.actions.interact());
 
     document.querySelectorAll<HTMLElement>('[data-close="help"]').forEach((node) => {
@@ -204,10 +259,12 @@ export class GameUI {
     }, 460);
   }
 
-  showMenu(bestWave: number, victories: number) {
+  showMenu(bestWave: number, victories: number, versusWins = 0, versusBestWave = 0) {
     this.menu.hidden = false;
     this.hud.hidden = true;
     this.bottomBar.hidden = true;
+    this.duelPanel.hidden = true;
+    this.blessingBar.hidden = true;
     this.crosshair.hidden = true;
     this.interactPrompt.hidden = true;
     this.touchControls.hidden = true;
@@ -216,10 +273,121 @@ export class GameUI {
     } else {
       this.menuBest.textContent = '最佳纪录：—';
     }
+    this.menuVersusBest.textContent =
+      versusBestWave > 0 || versusWins > 0
+        ? `对垒纪录：第 ${versusBestWave} 波${versusWins > 0 ? ` · ${versusWins} 胜` : ''}`
+        : '对垒纪录：—';
   }
 
   hideMenu() {
     this.menu.hidden = true;
+  }
+
+  setRival(rival: RivalState | null, playerLives = 0) {
+    this.duelPanel.hidden = !rival;
+    if (!rival) return;
+    this.duelYourLives.textContent = String(Math.max(0, Math.ceil(playerLives)));
+    this.duelRivalLives.textContent = String(Math.max(0, Math.ceil(rival.lives)));
+    this.duelRivalName.textContent = rival.name;
+    this.duelRivalWave.textContent = rival.alive
+      ? `${rival.title} · 已守 ${rival.wave} 波`
+      : `${rival.title} · 已失守`;
+  }
+
+  setBlessings(stacks: Array<{ icon: string; name: string; stacks: number }>) {
+    const key = stacks.map((entry) => `${entry.name}:${entry.stacks}`).join('|');
+    if (key === this.lastBlessingKey) return;
+    this.lastBlessingKey = key;
+    this.blessingBar.replaceChildren();
+    this.blessingBar.hidden = stacks.length === 0;
+    for (const entry of stacks) {
+      const chip = document.createElement('span');
+      chip.className = 'blessing-chip';
+      chip.title = `${entry.name} ×${entry.stacks}`;
+      const icon = document.createElement('span');
+      icon.textContent = entry.icon;
+      const name = document.createElement('b');
+      name.textContent = entry.name;
+      const count = document.createElement('em');
+      count.textContent = `×${entry.stacks}`;
+      chip.append(icon, name, count);
+      this.blessingBar.appendChild(chip);
+    }
+  }
+
+  showBlessings(choices: BlessingChoice[], wave: number, total: number, pickNumber: number) {
+    this.blessingCards.replaceChildren();
+    this.blessingLead.textContent = `第 ${wave} / ${total} 波守住了。从下面三项季令中选一项，整局有效。`;
+    this.blessingProgress.textContent = `第 ${pickNumber} 次选择`;
+    const rarityLabel = { common: '普通', rare: '稀有', epic: '史诗' } as const;
+    for (const choice of choices) {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = `blessing-card is-${choice.def.rarity}`;
+      card.dataset.blessing = choice.def.id;
+      const icon = document.createElement('span');
+      icon.className = 'blessing-icon';
+      icon.textContent = choice.def.icon;
+      const name = document.createElement('span');
+      name.className = 'blessing-name';
+      name.textContent = choice.def.name;
+      const desc = document.createElement('span');
+      desc.className = 'blessing-desc';
+      desc.textContent = choice.def.description;
+      const meta = document.createElement('span');
+      meta.className = 'blessing-meta';
+      const rarity = document.createElement('span');
+      rarity.className = 'blessing-rarity';
+      rarity.textContent = rarityLabel[choice.def.rarity];
+      const stacks = document.createElement('span');
+      stacks.textContent = choice.stacks > 0 ? `已叠 ${choice.stacks} / ${choice.def.maxStacks}` : '首次选择';
+      meta.append(rarity, stacks);
+      card.append(icon, name, desc, meta);
+      this.blessingCards.appendChild(card);
+    }
+    this.blessingScreen.hidden = false;
+  }
+
+  hideBlessings() {
+    this.blessingScreen.hidden = true;
+  }
+
+  showShop(offers: ShopOffer[], wave: number, rerollCost: number, gold: number, purchases = 0) {
+    this.shopCards.replaceChildren();
+    this.shopLead.textContent = `第 ${wave} 波后，行商在田边歇脚。你有 ${Math.floor(gold)} 金币；每次限购 2 件（已购 ${purchases}/2）。`;
+    for (const offer of offers) {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = `shop-card${offer.sold ? ' is-sold' : ''}`;
+      card.dataset.shop = offer.item.id;
+      card.disabled = offer.sold || gold < offer.price || purchases >= 2;
+      const icon = document.createElement('span');
+      icon.className = 'shop-icon';
+      icon.textContent = offer.item.icon;
+      const name = document.createElement('span');
+      name.className = 'shop-name';
+      name.textContent = offer.item.name;
+      const desc = document.createElement('span');
+      desc.className = 'shop-desc';
+      desc.textContent = offer.item.description;
+      const price = document.createElement('span');
+      price.className = `shop-price${gold < offer.price && !offer.sold ? ' is-unaffordable' : ''}`;
+      price.textContent = offer.sold ? '已售出' : `🪙 ${offer.price}`;
+      card.append(icon, name, desc, price);
+      this.shopCards.appendChild(card);
+    }
+    this.shopReroll.textContent = `刷新商品 · ${rerollCost} 金币`;
+    this.shopReroll.disabled = gold < rerollCost;
+    this.shopScreen.hidden = false;
+  }
+
+  hideShop() {
+    this.shopScreen.hidden = true;
+  }
+
+  hideIntermission() {
+    this.blessingScreen.hidden = true;
+    this.shopScreen.hidden = true;
   }
 
   showGameHud() {
@@ -230,6 +398,9 @@ export class GameUI {
   hideGameHud() {
     this.hud.hidden = true;
     this.bottomBar.hidden = true;
+    this.duelPanel.hidden = true;
+    this.blessingBar.hidden = true;
+    this.hideIntermission();
     this.crosshair.hidden = true;
     this.interactPrompt.hidden = true;
     this.touchControls.hidden = true;
@@ -461,6 +632,10 @@ export class GameUI {
     upgrade.textContent = data.upgradeLabel;
     upgrade.disabled = !data.upgradeEnabled;
     upgrade.hidden = data.upgradeLabel.length === 0;
+    const merge = el<HTMLButtonElement>('btn-merge');
+    merge.textContent = data.mergeLabel;
+    merge.disabled = !data.mergeEnabled;
+    merge.hidden = data.mergeLabel.length === 0;
     const sell = el<HTMLButtonElement>('btn-sell');
     sell.textContent = data.sellLabel;
     sell.disabled = !data.sellEnabled;
@@ -491,21 +666,53 @@ export class GameUI {
   showEnd(data: EndData) {
     this.end.hidden = false;
     el('end-glyph').textContent = data.victory ? '🌾' : '🥀';
-    el('end-kicker').textContent = data.victory ? 'THE FIELD HOLDS' : 'THE FIELD FALLS';
-    el('end-title').textContent = data.victory ? '守望成功' : '田野失守';
-    el('end-lead').textContent = data.victory
-      ? '最后一波野兽退去，风又吹过麦浪。你用六波坚守证明了：最好的防御，是从土地里长出来的。'
-      : '守望之种的光芒熄灭了。别灰心——下一季，先把荒地开成田，再让塔覆盖石径。';
+    const isVersus = data.mode === 'versus';
+    el('end-kicker').textContent = isVersus
+      ? data.victory
+        ? 'THE DUEL IS WON'
+        : 'THE DUEL IS LOST'
+      : data.victory
+        ? 'THE FIELD HOLDS'
+        : 'THE FIELD FALLS';
+    el('end-title').textContent = isVersus
+      ? data.victory
+        ? '对垒胜利'
+        : '对垒失守'
+      : data.victory
+        ? '守望成功'
+        : '田野失守';
+    const rivalName = data.rivalName ?? '对手';
+    if (isVersus) {
+      if (data.reason === 'rival') {
+        el('end-lead').textContent = `${rivalName}的田先失守了。你守到第 ${Math.min(data.wave, data.total)} 波，赢下了这一季对垒。`;
+      } else if (data.reason === 'compare') {
+        el('end-lead').textContent = data.victory
+          ? `八波结束，你以 ${data.lives} 命对 ${data.rivalLives ?? 0} 命赢下了这场对垒。`
+          : `八波结束，你以 ${data.lives} 命对 ${data.rivalLives ?? 0} 命惜败。再调整一次开垦与塔位。`;
+      } else if (data.reason === 'lives') {
+        el('end-lead').textContent = `守望之种熄灭时，${rivalName}还有 ${data.rivalLives ?? 0} 命。调整塔位与季令，再来一季。`;
+      } else {
+        el('end-lead').textContent = `这一季的对垒结束了。你守到第 ${Math.min(data.wave, data.total)} 波。`;
+      }
+    } else {
+      el('end-lead').textContent = data.victory
+        ? '最后一波野兽退去，风又吹过麦浪。你用六波坚守证明了：最好的防御，是从土地里长出来的。'
+        : '守望之种的光芒熄灭了。别灰心——下一季，先把荒地开成田，再让塔覆盖石径。';
+    }
     const stats = el('end-stats');
     stats.replaceChildren();
     const entries: Array<[string, string]> = [
+      ['模式', isVersus ? '对垒 · 8 波' : '守成 · 6 波'],
       ['到达波次', `${Math.min(data.wave, data.total)} / ${data.total}`],
+      ['剩余生命', `${data.lives} / ${data.maxLives}`],
       ['击杀野兽', String(data.kills)],
       ['种田收获', `${data.harvestedGold} 金币`],
       ['建成塔台', String(data.towersBuilt)],
-      ['坚守时长', formatDuration(data.seconds)],
-      ['结果', data.victory ? '守成' : '失守'],
     ];
+    if (isVersus) {
+      entries.push(['季令 / 合成', `${data.blessings} / ${data.merges}`], ['对手剩余', `${data.rivalLives ?? 0} 命`]);
+    }
+    entries.push(['坚守时长', formatDuration(data.seconds)], ['结果', data.victory ? (isVersus ? '胜' : '守成') : '失守']);
     for (const [label, value] of entries) {
       const node = document.createElement('div');
       node.className = 'end-stat';

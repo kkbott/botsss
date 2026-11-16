@@ -10,7 +10,8 @@
     "preview": "vite preview --port 4173 --strictPort",
     "verify": "node scripts/verify.mjs",
     "screenshots": "node scripts/screenshots.mjs",
-    "setup:browser": "playwright install chromium"
+    "setup:browser": "playwright install chromium",
+    "screenshots:v2": "node scripts/screenshots-v2.mjs"
   },
   "dependencies": {
     "three": "0.187.0"
