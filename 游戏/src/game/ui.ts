@@ -1,5 +1,5 @@
 import { CROPS, ENEMIES, RULES, TOWERS, WORLD } from './config';
-import type { CropId, TowerId } from './types';
+import type { CameraMode, CropId, TowerId } from './types';
 
 export interface UIActions {
   start: () => void;
@@ -8,7 +8,8 @@ export interface UIActions {
   quitToMenu: () => void;
   selectCrop: (id: CropId) => void;
   selectTower: (id: TowerId) => void;
-  harvestAll: () => void;
+  interact: () => void;
+  toggleCamera: () => void;
   nextWave: () => void;
   togglePause: () => void;
   toggleSpeed: () => void;
@@ -52,6 +53,15 @@ export interface EndData {
   towersBuilt: number;
   seconds: number;
   record: string;
+}
+
+export interface InteractPrompt {
+  key: string;
+  title: string;
+  detail: string;
+  tone: 'action' | 'info' | 'warn' | 'work';
+  progress?: number;
+  actionable: boolean;
 }
 
 const el = <T extends HTMLElement = HTMLElement>(id: string): T => {
@@ -104,10 +114,22 @@ export class GameUI {
   private readonly statGold = el('stat-gold');
   private readonly statStar = el('stat-star');
   private readonly statLives = el('stat-lives');
+  private readonly statFarm = el('stat-farm');
   private readonly fpsBadge = el('fps-badge');
   private readonly soundBtn = el('btn-sound');
   private readonly speedBtn = el('btn-speed');
+  private readonly cameraBtn = el('btn-camera');
   private readonly menuBest = el('menu-best');
+  private readonly crosshair = el('crosshair');
+  private readonly interactPrompt = el('interact-prompt');
+  private readonly interactKey = el('interact-key');
+  private readonly interactTitle = el('interact-title');
+  private readonly interactDetail = el('interact-detail');
+  private readonly interactProgress = el<HTMLElement>('interact-progress');
+  private readonly interactFill = el<HTMLElement>('interact-progress-fill');
+  private readonly lockHint = el('lock-hint');
+  private readonly touchControls = el('touch-controls');
+  private readonly interactBtn = el<HTMLButtonElement>('btn-interact');
   private readonly contextCards: HTMLButtonElement[];
   private bannerTimeout = 0;
   private hintTimeout = 0;
@@ -115,6 +137,10 @@ export class GameUI {
   private fpsCount = 0;
   private lastFpsValue = 0;
   private currentTool: { kind: 'crop' | 'tower'; id: CropId | TowerId } | null = null;
+  private lastPromptKey = '';
+  private lastLockHintVisible: boolean | null = null;
+  private lastTouchVisible: boolean | null = null;
+  private lastCameraMode: CameraMode | null = null;
   onHelpClosed: (() => void) | null = null;
 
   constructor(actions: UIActions) {
@@ -127,7 +153,7 @@ export class GameUI {
     el('btn-pause').addEventListener('click', () => this.actions.togglePause());
     el('btn-speed').addEventListener('click', () => this.actions.toggleSpeed());
     el('btn-sound').addEventListener('click', () => this.actions.toggleSound());
-    el('btn-harvest-all').addEventListener('click', () => this.actions.harvestAll());
+    el('btn-camera').addEventListener('click', () => this.actions.toggleCamera());
     el('btn-next-wave').addEventListener('click', () => this.actions.nextWave());
     el('btn-resume').addEventListener('click', () => this.actions.resume());
     el('btn-restart').addEventListener('click', () => this.actions.restart());
@@ -137,6 +163,7 @@ export class GameUI {
     el('btn-inspector-close').addEventListener('click', () => this.actions.closeInspector());
     el('btn-upgrade').addEventListener('click', () => this.actions.upgradeTower());
     el('btn-sell').addEventListener('click', () => this.actions.sellTower());
+    el('btn-interact').addEventListener('click', () => this.actions.interact());
 
     document.querySelectorAll<HTMLElement>('[data-close="help"]').forEach((node) => {
       node.addEventListener('click', () => this.hideHelp());
@@ -181,6 +208,9 @@ export class GameUI {
     this.menu.hidden = false;
     this.hud.hidden = true;
     this.bottomBar.hidden = true;
+    this.crosshair.hidden = true;
+    this.interactPrompt.hidden = true;
+    this.touchControls.hidden = true;
     if (bestWave > 0) {
       this.menuBest.textContent = `最佳纪录：第 ${bestWave} 波${victories > 0 ? ` · ${victories} 次守成` : ''}`;
     } else {
@@ -200,15 +230,20 @@ export class GameUI {
   hideGameHud() {
     this.hud.hidden = true;
     this.bottomBar.hidden = true;
+    this.crosshair.hidden = true;
+    this.interactPrompt.hidden = true;
+    this.touchControls.hidden = true;
+    this.lockHint.hidden = true;
     this.hideInspector();
     this.hideTooltip();
   }
 
-  setResources(gold: number, star: number, lives: number, maxLives: number) {
+  setResources(gold: number, star: number, lives: number, maxLives: number, farmland = 0, totalPlots = 0) {
     this.statGold.textContent = String(Math.floor(gold));
     this.statStar.textContent = String(Math.floor(star));
     this.statLives.textContent = `${Math.max(0, Math.ceil(lives))}/${maxLives}`;
     this.statLives.closest('.chip')?.classList.toggle('is-danger', lives <= maxLives * 0.3);
+    if (this.statFarm) this.statFarm.textContent = totalPlots > 0 ? `${farmland}/${totalPlots}` : String(farmland);
     const goldEl = this.statGold;
     const starEl = this.statStar;
     if (goldEl.dataset.last !== String(gold)) {
@@ -268,13 +303,13 @@ export class GameUI {
     canvas?.classList.toggle('is-planting', kind === 'crop');
     if (kind === 'crop' && id) {
       const crop = CROPS[id as CropId];
-      this.setContextHint(`${crop.name}：点击空地播种（${crop.cost} 金币），鼠标拖动可连播；点击成熟作物收获`);
+      this.setContextHint(`${crop.name}：走到农田旁按 E 播种（${crop.cost} 金币）`);
     } else if (kind === 'tower' && id) {
       const tower = TOWERS[id as TowerId];
       const starText = tower.starCost > 0 ? `${tower.starCost} 星辉 + ` : '';
-      this.setContextHint(`${tower.name}：点击发光的石台建造（${starText}${tower.cost} 金币）；点击已建塔可升级`);
+      this.setContextHint(`${tower.name}：走到荒地或空农田旁按 E 建塔（${starText}${tower.cost} 金币）`);
     } else {
-      this.setContextHint('选择作物后点击农田播种；选择防御塔后点击石台建造；点击已有塔可升级');
+      this.setContextHint(this.defaultHint());
     }
   }
 
@@ -290,10 +325,10 @@ export class GameUI {
 
   defaultHint() {
     if (this.currentTool) {
-      if (this.currentTool.kind === 'crop') return '点击空地播种，拖动可连续播种；点击成熟作物收获';
-      return '点击发光石台建造；点击已有塔可升级';
+      if (this.currentTool.kind === 'crop') return '走到农田旁按 E 播种；成熟后按 E 收获';
+      return '走到荒地或空农田旁按 E 建塔；点击已有塔可升级';
     }
-    return '选择作物后点击农田播种；选择防御塔后点击石台建造；点击已有塔可升级';
+    return 'WASD 移动 · 鼠标看 · E 开垦/播种/收获/建塔 · V 俯瞰视角';
   }
 
   setSpeedLabel(speed: number) {
@@ -305,6 +340,59 @@ export class GameUI {
     this.soundBtn.textContent = muted ? '🔇' : '♪';
     this.soundBtn.classList.toggle('is-muted', muted);
     this.soundBtn.setAttribute('aria-label', muted ? '开启音效' : '静音');
+  }
+
+  setCameraMode(mode: CameraMode) {
+    if (this.lastCameraMode === mode) return;
+    this.lastCameraMode = mode;
+    this.cameraBtn.textContent = mode === 'first' ? '👁 俯瞰' : '👁 第一人称';
+    this.cameraBtn.title = mode === 'first' ? '切换到俯瞰视角 (V)' : '切换到第一人称 (V)';
+    this.cameraBtn.classList.toggle('is-active', mode === 'overview');
+    this.cameraBtn.setAttribute('aria-pressed', mode === 'overview' ? 'true' : 'false');
+    document.body.classList.toggle('is-overview', mode === 'overview');
+  }
+
+  setCrosshair(visible: boolean) {
+    this.crosshair.hidden = !visible;
+  }
+
+  setInteractPrompt(prompt: InteractPrompt | null) {
+    const key = prompt ? `${prompt.title}|${prompt.detail}|${prompt.tone}|${prompt.key}|${prompt.progress ?? ''}` : '';
+    if (key !== this.lastPromptKey) {
+      this.lastPromptKey = key;
+      if (!prompt) {
+        this.interactPrompt.hidden = true;
+      } else {
+        this.interactPrompt.hidden = false;
+        this.interactPrompt.dataset.tone = prompt.tone;
+        this.interactKey.textContent = prompt.key || '·';
+        this.interactKey.hidden = prompt.key.length === 0;
+        this.interactTitle.textContent = prompt.title;
+        this.interactDetail.textContent = prompt.detail;
+        this.interactProgress.hidden = prompt.progress === undefined;
+        if (prompt.progress !== undefined) this.interactFill.style.transform = `scaleX(${Math.min(1, Math.max(0, prompt.progress))})`;
+      }
+    }
+    this.interactBtn.disabled = !prompt?.actionable;
+    this.interactBtn.classList.toggle('is-ready', !!prompt?.actionable);
+  }
+
+  setTouchInteractEnabled(enabled: boolean) {
+    this.interactBtn.disabled = !enabled;
+    this.interactBtn.classList.toggle('is-ready', enabled);
+  }
+
+  setLockHint(visible: boolean) {
+    if (this.lastLockHintVisible === visible) return;
+    this.lastLockHintVisible = visible;
+    this.lockHint.hidden = !visible;
+  }
+
+  setTouchControlsVisible(visible: boolean) {
+    if (this.lastTouchVisible === visible) return;
+    this.lastTouchVisible = visible;
+    this.touchControls.hidden = !visible;
+    document.body.classList.toggle('is-touch-play', visible);
   }
 
   showBanner(kicker: string, title: string, sub: string, danger = false, duration = 2600) {
@@ -407,7 +495,7 @@ export class GameUI {
     el('end-title').textContent = data.victory ? '守望成功' : '田野失守';
     el('end-lead').textContent = data.victory
       ? '最后一波野兽退去，风又吹过麦浪。你用六波坚守证明了：最好的防御，是从土地里长出来的。'
-      : '守望之种的光芒熄灭了。别灰心——下一季，先把麦田种满，再让箭塔覆盖石径。';
+      : '守望之种的光芒熄灭了。别灰心——下一季，先把荒地开成田，再让塔覆盖石径。';
     const stats = el('end-stats');
     stats.replaceChildren();
     const entries: Array<[string, string]> = [
@@ -454,6 +542,10 @@ export class GameUI {
 
   get fps() {
     return this.lastFpsValue;
+  }
+
+  get inspectorOpen() {
+    return !this.inspector.hidden;
   }
 
   flashDamage() {

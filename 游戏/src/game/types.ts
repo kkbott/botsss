@@ -4,6 +4,12 @@ export type EnemyId = 'fox' | 'wolf' | 'bull' | 'stag';
 export type GamePhase = 'loading' | 'menu' | 'playing' | 'paused' | 'victory' | 'defeat';
 export type WavePhase = 'prep' | 'active' | 'cleared';
 export type Quality = 'high' | 'low';
+/** First-person is the default; the old orbit camera survives as a switchable overview. */
+export type CameraMode = 'first' | 'overview';
+/** A plot is either untouched wild land, cleared farmland, or the base of a tower. */
+export type PlotState = 'wild' | 'farmland' | 'tower';
+/** What a plot becomes when its tower is dismantled. */
+export type LandState = 'wild' | 'farmland';
 
 export interface CropDef {
   id: CropId;
@@ -81,13 +87,6 @@ export interface PlotSpec {
   z: number;
 }
 
-export interface PadSpec {
-  index: number;
-  x: number;
-  z: number;
-  rotation: number;
-}
-
 export type CropStage = 0 | 1 | 2 | 3;
 
 export interface CropRuntime {
@@ -97,17 +96,25 @@ export interface CropRuntime {
   mature: boolean;
 }
 
+export interface ReclaimJob {
+  elapsed: number;
+  total: number;
+}
+
 export interface PlotRuntime {
   spec: PlotSpec;
-  unlocked: boolean;
+  state: PlotState;
+  /** Used to restore a plot after its tower is dismantled. */
+  underlying: LandState;
   scorched: boolean;
   crop: CropRuntime | null;
+  reclaim: ReclaimJob | null;
   group: import('three').Group;
 }
 
 export interface TowerRuntime {
   id: TowerId;
-  pad: PadSpec;
+  plot: PlotSpec;
   level: 1 | 2 | 3;
   cooldown: number;
   group: import('three').Group;
@@ -155,6 +162,7 @@ export interface GameStats {
   towersBuilt: number;
   leaks: number;
   playSeconds: number;
+  reclaimed: number;
 }
 
 export interface SaveData {

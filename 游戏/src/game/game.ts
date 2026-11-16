@@ -14,8 +14,8 @@ import {
   Vector3,
 } from 'three';
 import { CROPS, ENEMIES, PLOTS, RULES, STORAGE_KEY, TOWERS, WAVES, WORLD } from './config';
-import { TOWER_PADS } from './config';
 import type {
+  CameraMode,
   CropId,
   CropStage,
   EnemyId,
@@ -32,21 +32,11 @@ import type {
 } from './types';
 import { AudioEngine, type SoundName } from './audio';
 import { FloatingTexts, ParticleSystem } from './effects';
-import { GameUI, type InspectorData, type UIActions } from './ui';
+import { GameUI, type InteractPrompt, type InspectorData, type UIActions } from './ui';
 import { World, type PlotVisual } from './world';
+import { Player } from './player';
 import type { ArtProvider } from './art';
 import type { EnvironmentAssets } from './assets';
-
-interface PointerState {
-  downX: number;
-  downY: number;
-  time: number;
-  pick: { kind: 'plot' | 'pad'; index: number } | null;
-  acted: boolean;
-  painting: boolean;
-  pointerId: number;
-  pointerType: string;
-}
 
 interface ArrowProjectile {
   kind: 'arrow';
@@ -86,7 +76,6 @@ interface CachedSave {
 }
 
 const HERO_Y = 0.02;
-
 function readSave(): CachedSave {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -136,6 +125,7 @@ function timeText(seconds: number) {
 
 export class Game {
   private readonly world: World;
+  private readonly player: Player;
   private readonly art: ArtProvider;
   private readonly audio: AudioEngine;
   private readonly ui: GameUI;
@@ -145,6 +135,7 @@ export class Game {
   private readonly canvas: HTMLCanvasElement;
 
   private phase: GamePhase = 'loading';
+  private mode: CameraMode = 'first';
   private speed: number = 1;
   private gold: number = RULES.startingGold;
   private star: number = 0;
@@ -166,13 +157,19 @@ export class Game {
   private beams: Beam[] = [];
   private selectedTool: { kind: 'crop' | 'tower'; id: CropId | TowerId } | null = null;
   private selectedTower: TowerRuntime | null = null;
-  private hovered: { kind: 'plot' | 'pad'; index: number } | null = null;
+  private activeReclaim: PlotRuntime | null = null;
+  private targetPlot: PlotRuntime | null = null;
+  private hoveredPlot: PlotRuntime | null = null;
+  private lastPointer = { x: 0, y: 0 };
   private previewRange: Mesh;
   private arrowGeo = new ConeGeometry(0.065, 0.38, 4);
   private mortarGeo = new SphereGeometry(0.16, 6, 4);
   private arrowMat = new MeshStandardMaterial({ color: 0xffe2a1, emissive: 0xa86c14, emissiveIntensity: 0.5, roughness: 0.5 });
   private mortarMat = new MeshStandardMaterial({ color: 0xff8b52, emissive: 0x8f2d10, emissiveIntensity: 0.55, roughness: 0.7 });
   private helpPausedRun = false;
+  private readonly isTouchDevice =
+    window.matchMedia('(pointer: coarse)').matches ||
+    (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0 && window.matchMedia('(hover: none)').matches);
 
   private stats: GameStats = {
     kills: 0,
@@ -182,6 +179,7 @@ export class Game {
     towersBuilt: 0,
     leaks: 0,
     playSeconds: 0,
+    reclaimed: 0,
   };
 
   private save: CachedSave;
@@ -193,8 +191,7 @@ export class Game {
   private lastHitSound = 0;
   private lastShotSound = 0;
   private lastErrorToast = 0;
-  private pointer: PointerState | null = null;
-  private lastPaintPlot = -1;
+  private promptTimer = 0;
 
   constructor(canvas: HTMLCanvasElement, art: ArtProvider, environment: EnvironmentAssets | null) {
     this.canvas = canvas;
@@ -208,18 +205,37 @@ export class Game {
     this.ui = new GameUI(this.buildActions());
     this.ui.onHelpClosed = () => this.closeHelp();
     this.ui.setMuted(this.save.muted);
+    this.player = new Player(
+      this.world.camera,
+      canvas,
+      (x, z) => this.resolvePlayer(x, z),
+      {
+        joystick: document.getElementById('joystick'),
+        joystickKnob: document.getElementById('joystick-knob'),
+      },
+      () => this.interact(),
+    );
+    this.world.scene.add(this.player.rig.group);
+    this.player.setAvatarVisible(false);
+    this.player.setMode('overview');
+    this.player.setEnabled(false);
     this.previewRange = this.makeRangeRing(0xa8c97b, 1);
     this.previewRange.visible = false;
     this.world.scene.add(this.previewRange);
     this.ui.setSpeedLabel(1);
+    this.ui.setCameraMode('overview');
+    this.ui.setInteractPrompt(null);
+    this.ui.setTouchControlsVisible(false);
+    this.ui.setCrosshair(false);
     this.resetPlots();
     this.bindInput();
     this.bindKeyboard();
     this.bindVisibility();
+    this.world.setCameraMode('orbit');
+    this.world.setMenuMode(true);
     this.world.updateAmbient(0);
     this.world.render();
     this.phase = 'menu';
-    this.world.setMenuMode(true);
     this.ui.showMenu(this.save.bestWave, this.save.victories);
     requestAnimationFrame(() => {
       this.ui.setLoading(1, '准备就绪');
@@ -250,7 +266,8 @@ export class Game {
       quitToMenu: () => this.goToMenu(),
       selectCrop: (id) => this.selectCrop(id),
       selectTower: (id) => this.selectTower(id),
-      harvestAll: () => this.harvestAll(),
+      interact: () => this.interact(),
+      toggleCamera: () => this.toggleCameraMode(),
       nextWave: () => this.startNextWave(true),
       togglePause: () => this.togglePause(),
       toggleSpeed: () => this.toggleSpeed(),
@@ -261,6 +278,24 @@ export class Game {
       closeInspector: () => this.clearTowerSelection(),
       retry: () => this.startGame(),
     };
+  }
+
+  private resolvePlayer(x: number, z: number) {
+    const resolved = this.world.resolvePlayer(x, z);
+    // Tower footings are solid; wild/farmland plots are walkable.
+    let px = resolved.x;
+    let pz = resolved.z;
+    for (const tower of this.towers) {
+      const dx = px - tower.plot.x;
+      const dz = pz - tower.plot.z;
+      const distance = Math.hypot(dx, dz);
+      const min = 1.72 + WORLD.player.radius;
+      if (distance < min && distance > 0.0001) {
+        px = tower.plot.x + (dx / distance) * min;
+        pz = tower.plot.z + (dz / distance) * min;
+      }
+    }
+    return { x: px, z: pz };
   }
 
   /* ───────────────────────────── lifecycle ───────────────────────────── */
@@ -285,11 +320,21 @@ export class Game {
     this.spawnIndex = 0;
     this.selectedTool = null;
     this.selectedTower = null;
-    this.hovered = null;
+    this.targetPlot = null;
+    this.hoveredPlot = null;
     this.accumulator = 0;
     this.runTime = 0;
     this.helpPausedRun = false;
-    this.stats = { kills: 0, harvestedGold: 0, harvestedStar: 0, planted: 0, towersBuilt: 0, leaks: 0, playSeconds: 0 };
+    this.stats = {
+      kills: 0,
+      harvestedGold: 0,
+      harvestedStar: 0,
+      planted: 0,
+      towersBuilt: 0,
+      leaks: 0,
+      playSeconds: 0,
+      reclaimed: 0,
+    };
     this.ui.hideMenu();
     this.ui.hideEnd();
     this.ui.hidePause();
@@ -298,13 +343,26 @@ export class Game {
     this.ui.setSelectedTool(null);
     this.ui.hideInspector();
     this.ui.hideTooltip();
-    this.ui.setResources(this.gold, this.star, this.lives, RULES.startingLives);
-    this.ui.showBanner('第 1 波准备', '先种下一片麦田', '金币来自收获。先播 3–4 块麦田，再在石台建第一座箭塔。', false, 3800);
     this.world.setMenuMode(false);
-    this.world.resetCamera(true);
+    this.world.setCameraMode('first');
+    this.player.reset();
+    this.player.setAvatarVisible(true);
+    this.player.setEnabled(true);
+    this.mode = 'first';
+    this.ui.setCameraMode('first');
+    this.ui.setCrosshair(true);
+    this.ui.showBanner(
+      '第 1 波准备',
+      '先把荒地变成麦田',
+      '走到地块旁按 E 开垦，再播种。金币来自收获，塔要建在能照看石径的地块上。',
+      false,
+      4200,
+    );
     this.previewRange.visible = false;
     this.phase = 'playing';
+    this.ui.setResources(this.gold, this.star, this.lives, RULES.startingLives, 0, this.plots.length);
     this.updateHudNow();
+    this.updateInteractionPrompt();
     this.audio.play('click');
   }
 
@@ -313,18 +371,24 @@ export class Game {
     if (this.phase === 'paused') {
       this.phase = 'playing';
       this.ui.showGameHud();
+      this.player.setEnabled(this.mode === 'first');
+      this.updateInteractionPrompt();
     }
   }
 
   private togglePause() {
     if (this.phase === 'playing') {
       this.phase = 'paused';
+      this.player.setEnabled(false);
+      this.player.releasePointer();
       this.ui.showPause();
       this.ui.hideTooltip();
       this.ui.hideInspector();
       this.ui.setSelectedTool(null);
+      this.ui.setInteractPrompt(null);
+      this.ui.setTouchControlsVisible(false);
       this.selectedTool = null;
-      this.hovered = null;
+      this.hoveredPlot = null;
       this.previewRange.visible = false;
       this.clearHighlights();
       this.audio.play('click');
@@ -337,42 +401,61 @@ export class Game {
     if (this.phase === 'playing') {
       this.helpPausedRun = true;
       this.phase = 'paused';
+      this.player.setEnabled(false);
+      this.player.releasePointer();
     }
     this.ui.showHelp();
     this.ui.hideTooltip();
+    this.ui.setInteractPrompt(null);
+    this.ui.setTouchControlsVisible(false);
   }
 
   private closeHelp() {
     if (this.helpPausedRun && this.phase === 'paused') {
       this.phase = 'playing';
       this.helpPausedRun = false;
+      this.player.setEnabled(this.mode === 'first');
+      this.updateInteractionPrompt();
     }
   }
 
   private goToMenu() {
     this.clearDynamicWorld();
-    this.clearHover();
+    this.clearHighlights();
     this.ui.hideEnd();
     this.ui.hidePause();
     this.ui.hideHelp();
     this.ui.hideGameHud();
+    this.ui.setInteractPrompt(null);
+    this.ui.setTouchControlsVisible(false);
+    this.ui.setCrosshair(false);
     this.ui.showMenu(this.save.bestWave, this.save.victories);
     this.world.setMenuMode(true);
+    this.world.setCameraMode('orbit');
     this.world.resetCamera(true);
+    this.player.setEnabled(false);
+    this.player.setMode('overview');
+    this.player.setAvatarVisible(false);
+    this.mode = 'overview';
     this.phase = 'menu';
   }
 
   private endGame(victory: boolean) {
     if (this.phase === 'victory' || this.phase === 'defeat') return;
     this.phase = victory ? 'victory' : 'defeat';
+    this.player.setEnabled(false);
+    this.player.releasePointer();
     this.clearTowerSelection();
     this.selectedTool = null;
     this.ui.setSelectedTool(null);
+    this.ui.setInteractPrompt(null);
+    this.ui.setTouchControlsVisible(false);
+    this.ui.setCrosshair(false);
     this.previewRange.visible = false;
     this.clearHighlights();
     this.ui.hideTooltip();
     this.ui.hideInspector();
-    this.clearHover();
+    this.clearTargetPlot();
     const reachedWave = victory ? RULES.totalWaves : Math.max(1, this.wave);
     this.save.bestWave = Math.max(this.save.bestWave, reachedWave);
     if (victory) this.save.victories += 1;
@@ -387,7 +470,12 @@ export class Game {
       seconds: this.stats.playSeconds,
       record: `最佳纪录：第 ${this.save.bestWave} 波${this.save.victories > 0 ? ` · ${this.save.victories} 次守成` : ''}`,
     });
+    this.player.setMode('overview');
+    this.player.setAvatarVisible(true);
     this.world.setMenuMode(true);
+    this.world.resetCamera(true);
+    this.mode = 'overview';
+    this.ui.setCameraMode('overview');
     this.audio.play(victory ? 'victory' : 'defeat');
     if (victory) {
       this.ui.showBanner('守成', '山野重归宁静', `你坚守了 ${timeText(this.stats.playSeconds)}，守住了所有农田。`, false, 4800);
@@ -421,24 +509,62 @@ export class Game {
     }
   }
 
-  /* ───────────────────────────── plots / crops ───────────────────────────── */
+  private toggleCameraMode() {
+    if (this.phase !== 'playing') return;
+    if (this.mode === 'first') {
+      this.player.releasePointer();
+      this.player.setEnabled(false);
+      this.player.setMode('overview');
+      this.world.setOverviewFromPlayer(this.player.position, this.player.yaw);
+      this.mode = 'overview';
+      this.ui.setCameraMode('overview');
+      this.ui.setInteractPrompt(null);
+      this.ui.setCrosshair(false);
+      this.ui.setTouchControlsVisible(false);
+      this.ui.hideTooltip();
+      this.previewRange.visible = false;
+      this.clearHighlights();
+      this.audio.play('click');
+      this.ui.toast('俯瞰视角：滚轮缩放、拖动旋转；再按 V 返回第一人称', 'default');
+    } else {
+      this.world.setCameraMode('first');
+      this.player.setMode('first');
+      this.player.setEnabled(true);
+      this.mode = 'first';
+      this.ui.setCameraMode('first');
+      this.ui.setCrosshair(true);
+      this.ui.hideTooltip();
+      this.audio.play('click');
+      this.ui.toast('第一人称：点击画面锁定鼠标，E 交互', 'default');
+      this.updateInteractionPrompt();
+    }
+  }
+
+  /* ───────────────────────────── plots / land ───────────────────────────── */
 
   private resetPlots() {
+    this.activeReclaim = null;
     this.plots = [];
     for (const view of this.world.plotVisuals) {
-      while (view.cropAnchor.children.length) view.cropAnchor.children[0].removeFromParent();
-      view.locked.visible = view.spec.index >= WORLD.farm.initialUnlocked;
-      view.scorched.visible = false;
-      view.matureGlow.visible = false;
+      this.clearCropVisual(view);
       view.highlight.visible = false;
+      view.matureGlow.visible = false;
+      view.scorched.visible = false;
+      view.wild.scale.setScalar(1);
+      view.wild.position.set(0, 0, 0);
+      view.farm.scale.setScalar(1);
+      view.farm.position.set(0, 0, 0);
       const plot: PlotRuntime = {
         spec: view.spec,
-        unlocked: view.spec.index < WORLD.farm.initialUnlocked,
+        state: 'wild',
+        underlying: 'wild',
         scorched: false,
         crop: null,
+        reclaim: null,
         group: view.group,
       };
       this.plots.push(plot);
+      this.world.syncPlotVisual(plot, view);
     }
   }
 
@@ -446,52 +572,48 @@ export class Game {
     return this.world.plotVisuals[index];
   }
 
-  private unlockCost(index: number) {
-    const i = Math.max(0, index - WORLD.farm.initialUnlocked);
-    return WORLD.farm.unlockCosts[Math.min(i, WORLD.farm.unlockCosts.length - 1)] ?? 110;
+  private reclaimedCount() {
+    return this.plots.filter((plot) => plot.underlying === 'farmland').length;
+  }
+
+  private reclaimCost() {
+    const count = this.reclaimedCount();
+    return Math.min(RULES.reclaimMaxCost, RULES.reclaimBaseCost + count * RULES.reclaimStep);
   }
 
   private syncPlot(plot: PlotRuntime) {
-    const view = this.viewFor(plot.spec.index);
-    view.locked.visible = !plot.unlocked;
-    view.scorched.visible = plot.scorched;
-    view.matureGlow.visible = !!plot.crop?.mature;
-    view.highlight.visible = false;
+    this.world.syncPlotVisual(plot, this.viewFor(plot.spec.index));
   }
 
-  private clearCropVisual(plot: PlotRuntime) {
-    const view = this.viewFor(plot.spec.index);
+  private clearCropVisual(view: PlotVisual) {
     while (view.cropAnchor.children.length) view.cropAnchor.children[0].removeFromParent();
   }
 
   private setCropVisual(plot: PlotRuntime, stage: CropStage) {
     if (!plot.crop) return;
     const view = this.viewFor(plot.spec.index);
-    this.clearCropVisual(plot);
+    this.clearCropVisual(view);
     const art = this.art.crop(plot.crop.type, stage, stage === 3);
     art.group.rotation.y = ((plot.spec.index * 2.399) % (Math.PI * 2)) + 0.4;
-    art.group.scale.setScalar(0.92 + ((plot.spec.index * 7) % 5) * 0.018);
+    art.group.scale.setScalar(WORLD.farm.cropScale * (0.94 + ((plot.spec.index * 7) % 5) * 0.016));
     view.cropAnchor.add(art.group);
   }
 
-  private plantPlot(index: number) {
-    if (this.phase !== 'playing' || !this.selectedTool || this.selectedTool.kind !== 'crop') return false;
-    return this.plantCrop(index, this.selectedTool.id as CropId, false);
-  }
-
-  private plantCrop(index: number, type: CropId, unlockIfNeeded: boolean) {
+  private plantCrop(index: number, type: CropId, silent = false) {
+    if (this.phase !== 'playing') return false;
     const plot = this.plots[index];
     if (!plot) return false;
-    if (!plot.unlocked) {
-      if (!unlockIfNeeded) return false;
-      return this.tryUnlock(index, true);
+    if (plot.state !== 'farmland') {
+      if (!silent) this.nudgeError('这块地还不是农田：先按 E 开垦');
+      return false;
     }
-    if (plot.scorched) return false;
+    if (plot.scorched) {
+      if (!silent) this.nudgeError('焦土需要先修复');
+      return false;
+    }
+    if (plot.reclaim) return false;
     if (plot.crop) {
-      if (plot.crop.mature) {
-        this.harvestPlot(index);
-        return true;
-      }
+      if (plot.crop.mature) return this.harvestPlot(index);
       return false;
     }
     const def = CROPS[type];
@@ -504,9 +626,9 @@ export class Game {
     plot.crop = { type, elapsed: 0, stage: 0, mature: false };
     this.setCropVisual(plot, 0);
     this.syncPlot(plot);
-    const pos = new Vector3(plot.spec.x, 0.45, plot.spec.z);
-    this.particles.spawn(pos, def.accent, 7, { speed: 1.5, life: 0.5, size: 0.075, gravity: 3.5, up: 1.4 });
-    this.floaters.spawn(`-${def.cost}`, new Vector3(plot.spec.x, 0.9, plot.spec.z), 'warn');
+    const pos = new Vector3(plot.spec.x, 0.5, plot.spec.z);
+    this.particles.spawn(pos, def.accent, 8, { speed: 1.6, life: 0.55, size: 0.075, gravity: 3.5, up: 1.5 });
+    this.floaters.spawn(`-${def.cost}`, new Vector3(plot.spec.x, 1.0, plot.spec.z), 'warn');
     this.audio.play('plant');
     this.updateHudNow();
     return true;
@@ -520,17 +642,17 @@ export class Game {
     this.star += def.yieldStar;
     this.stats.harvestedGold += def.yieldGold;
     this.stats.harvestedStar += def.yieldStar;
-    const pos = new Vector3(plot.spec.x, 0.75, plot.spec.z);
+    const pos = new Vector3(plot.spec.x, 0.8, plot.spec.z);
     this.particles.burstHarvest(pos, def.color, def.yieldStar > 0);
-    this.floaters.spawn(`+${def.yieldGold}`, new Vector3(plot.spec.x, 1.2, plot.spec.z), 'gold');
+    this.floaters.spawn(`+${def.yieldGold}`, new Vector3(plot.spec.x, 1.3, plot.spec.z), 'gold');
     if (def.yieldStar > 0) {
-      this.floaters.spawn(`+${def.yieldStar} 星辉`, new Vector3(plot.spec.x + 0.3, 1.7, plot.spec.z), 'star');
+      this.floaters.spawn(`+${def.yieldStar} 星辉`, new Vector3(plot.spec.x + 0.35, 1.8, plot.spec.z), 'star');
       this.audio.play('star');
     } else {
       this.audio.play('harvest');
     }
     plot.crop = null;
-    this.clearCropVisual(plot);
+    this.clearCropVisual(this.viewFor(plot.spec.index));
     this.syncPlot(plot);
     this.updateHudNow();
     if (!silent && def.yieldStar > 0) {
@@ -552,63 +674,76 @@ export class Game {
     this.updateHudNow();
   }
 
-  private updateCrops(dt: number) {
-    this.runTime += dt;
-    for (const plot of this.plots) {
-      if (!plot.crop) continue;
-      const def = CROPS[plot.crop.type];
-      if (!plot.crop.mature) {
-        plot.crop.elapsed += dt;
-        const progress = Math.min(1, plot.crop.elapsed / def.growTime);
-        const nextStage: CropStage = progress >= 1 ? 3 : progress < 0.34 ? 0 : progress < 0.67 ? 1 : 2;
-        const becameMature = nextStage === 3;
-        if (nextStage !== plot.crop.stage) {
-          plot.crop.stage = nextStage;
-          plot.crop.mature = becameMature;
-          this.setCropVisual(plot, nextStage);
-          this.syncPlot(plot);
-          if (becameMature) {
-            this.particles.spawn(new Vector3(plot.spec.x, 0.6, plot.spec.z), def.accent, 4, {
-              speed: 0.8,
-              life: 0.5,
-              size: 0.06,
-              gravity: 2,
-              up: 1.2,
-            });
-          }
-        }
-      }
-      const view = this.viewFor(plot.spec.index);
-      const visual = view.cropAnchor.children[0];
-      if (visual) {
-        visual.rotation.z = Math.sin(this.runTime * 1.6 + plot.spec.index * 1.7) * 0.025;
-      }
-    }
-  }
-
-  private tryUnlock(index: number, silent = false) {
+  private startReclaim(index: number) {
+    if (this.phase !== 'playing') return false;
     const plot = this.plots[index];
-    if (!plot || plot.unlocked) return false;
-    const cost = this.unlockCost(index);
+    if (!plot || plot.state !== 'wild') return false;
+    if (this.activeReclaim) {
+      this.nudgeError('先把正在开垦的地块整理完');
+      return false;
+    }
+    const cost = this.reclaimCost();
     if (this.gold < cost) {
-      this.nudgeError(`金币不足：开垦这块田需要 ${cost} 金币`);
+      this.nudgeError(`金币不足：开垦这块荒地需要 ${cost} 金币`);
       return false;
     }
     this.gold -= cost;
-    plot.unlocked = true;
-    this.syncPlot(plot);
-    this.particles.spawn(new Vector3(plot.spec.x, 0.4, plot.spec.z), 0x9ac46b, 12, {
-      speed: 2.2,
-      life: 0.7,
-      size: 0.08,
-      gravity: 4,
-      up: 2,
+    plot.reclaim = { elapsed: 0, total: RULES.reclaimDuration };
+    this.activeReclaim = plot;
+    const view = this.viewFor(plot.spec.index);
+    view.farm.visible = true;
+    view.farm.scale.setScalar(0.35);
+    view.wild.scale.setScalar(1);
+    view.highlight.visible = true;
+    this.floaters.spawn(`-${cost}`, new Vector3(plot.spec.x, 1.0, plot.spec.z), 'warn');
+    this.particles.spawn(new Vector3(plot.spec.x, 0.3, plot.spec.z), 0x9ac46b, 8, {
+      speed: 1.6,
+      life: 0.6,
+      size: 0.075,
+      gravity: 3,
+      up: 1.6,
     });
-    this.floaters.spawn(`-${cost}`, new Vector3(plot.spec.x, 0.95, plot.spec.z), 'warn');
-    this.audio.play('build');
-    if (!silent) this.ui.toast(`开垦了一块新农田（-${cost} 金币）`, 'default');
+    this.audio.play('plant');
+    this.ui.toast(`开始开垦（-${cost} 金币），稍等片刻`, 'default');
     this.updateHudNow();
     return true;
+  }
+
+  private finishReclaim(plot: PlotRuntime) {
+    const view = this.viewFor(plot.spec.index);
+    plot.reclaim = null;
+    plot.state = 'farmland';
+    plot.underlying = 'farmland';
+    plot.scorched = false;
+    plot.crop = null;
+    this.activeReclaim = null;
+    view.wild.visible = false;
+    view.wild.scale.setScalar(1);
+    view.wild.position.set(0, 0, 0);
+    view.farm.visible = true;
+    view.farm.scale.setScalar(1);
+    view.farm.position.set(0, 0, 0);
+    view.highlight.visible = false;
+    this.syncPlot(plot);
+    this.stats.reclaimed += 1;
+    this.particles.spawn(new Vector3(plot.spec.x, 0.5, plot.spec.z), 0xd9b56d, 18, {
+      speed: 2.6,
+      life: 0.8,
+      size: 0.1,
+      gravity: 3.4,
+      up: 2.2,
+    });
+    this.particles.spawn(new Vector3(plot.spec.x, 0.8, plot.spec.z), 0x9ac46b, 10, {
+      speed: 1.8,
+      life: 0.9,
+      size: 0.08,
+      gravity: 1.2,
+      up: 2.4,
+    });
+    this.audio.play('harvest');
+    this.ui.toast('荒地开垦完成，已经可以播种了', 'default');
+    this.updateHudNow();
+    this.updateInteractionPrompt();
   }
 
   private repairPlot(index: number) {
@@ -622,10 +757,10 @@ export class Game {
     this.gold -= cost;
     plot.scorched = false;
     this.syncPlot(plot);
-    this.particles.spawn(new Vector3(plot.spec.x, 0.4, plot.spec.z), 0xa8c97b, 10, {
+    this.particles.spawn(new Vector3(plot.spec.x, 0.45, plot.spec.z), 0xa8c97b, 12, {
       speed: 2,
-      life: 0.6,
-      size: 0.075,
+      life: 0.65,
+      size: 0.08,
       gravity: 3,
       up: 1.8,
     });
@@ -636,23 +771,23 @@ export class Game {
   }
 
   private trampleCrops(count: number) {
-    const planted = this.plots.filter((plot) => plot.crop && plot.unlocked && !plot.scorched);
+    const planted = this.plots.filter((plot) => plot.crop && plot.state === 'farmland' && !plot.scorched);
     if (planted.length === 0) return 0;
     const shuffled = [...planted].sort(() => Math.random() - 0.5);
     const destroyed = shuffled.slice(0, Math.min(count, shuffled.length));
     for (const plot of destroyed) {
       plot.crop = null;
       plot.scorched = true;
-      this.clearCropVisual(plot);
+      this.clearCropVisual(this.viewFor(plot.spec.index));
       this.syncPlot(plot);
-      this.particles.spawn(new Vector3(plot.spec.x, 0.5, plot.spec.z), 0x4a3d2f, 10, {
+      this.particles.spawn(new Vector3(plot.spec.x, 0.55, plot.spec.z), 0x4a3d2f, 10, {
         speed: 1.6,
         life: 0.8,
         size: 0.11,
         gravity: 2,
         up: 1.4,
       });
-      this.particles.spawn(new Vector3(plot.spec.x, 0.5, plot.spec.z), 0xef8056, 6, {
+      this.particles.spawn(new Vector3(plot.spec.x, 0.55, plot.spec.z), 0xef8056, 6, {
         speed: 2.2,
         life: 0.6,
         size: 0.07,
@@ -663,10 +798,61 @@ export class Game {
     return destroyed.length;
   }
 
+  private updatePlots(dt: number) {
+    this.runTime += dt;
+    for (const plot of this.plots) {
+      const view = this.viewFor(plot.spec.index);
+      if (plot.reclaim) {
+        plot.reclaim.elapsed += dt;
+        const t = Math.min(1, plot.reclaim.elapsed / plot.reclaim.total);
+        view.wild.scale.setScalar(Math.max(0.08, 1 - t * 0.92));
+        view.farm.scale.setScalar(0.35 + t * 0.65);
+        if (Math.random() < dt * 9) {
+          this.particles.spawn(new Vector3(plot.spec.x + (Math.random() - 0.5) * 1.8, 0.25, plot.spec.z + (Math.random() - 0.5) * 1.8), 0x8d6a45, 2, {
+            speed: 1.1,
+            life: 0.55,
+            size: 0.07,
+            gravity: 2.5,
+            up: 1.6,
+          });
+        }
+        if (t >= 1) this.finishReclaim(plot);
+        continue;
+      }
+      if (!plot.crop) continue;
+      const def = CROPS[plot.crop.type];
+      if (!plot.crop.mature) {
+        plot.crop.elapsed += dt;
+        const progress = Math.min(1, plot.crop.elapsed / def.growTime);
+        const nextStage: CropStage = progress >= 1 ? 3 : progress < 0.34 ? 0 : progress < 0.67 ? 1 : 2;
+        const becameMature = nextStage === 3;
+        if (nextStage !== plot.crop.stage) {
+          plot.crop.stage = nextStage;
+          plot.crop.mature = becameMature;
+          this.setCropVisual(plot, nextStage);
+          this.syncPlot(plot);
+          if (becameMature) {
+            this.particles.spawn(new Vector3(plot.spec.x, 0.65, plot.spec.z), def.accent, 5, {
+              speed: 0.9,
+              life: 0.55,
+              size: 0.06,
+              gravity: 2,
+              up: 1.3,
+            });
+          }
+        }
+      }
+      const visual = view.cropAnchor.children[0];
+      if (visual) {
+        visual.rotation.z = Math.sin(this.runTime * 1.6 + plot.spec.index * 1.7) * 0.025;
+      }
+    }
+  }
+
   /* ───────────────────────────── towers ───────────────────────────── */
 
-  private towerAtPad(padIndex: number) {
-    return this.towers.find((tower) => tower.pad.index === padIndex) ?? null;
+  private towerAt(plotIndex: number) {
+    return this.towers.find((tower) => tower.plot.index === plotIndex) ?? null;
   }
 
   private makeRangeRing(color: number, opacity: number) {
@@ -680,21 +866,32 @@ export class Game {
     });
     const ring = new Mesh(geometry, material);
     ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.36;
+    ring.position.y = 0.38;
     ring.visible = false;
     ring.renderOrder = 1;
     return ring;
   }
 
-  private buildTowerAt(padIndex: number, type: TowerId) {
+  private buildTower(plotIndex: number, type: TowerId) {
     if (this.phase !== 'playing') return false;
-    const padSpec = this.world.padVisuals[padIndex]?.spec;
-    if (!padSpec) return false;
-    if (this.towerAtPad(padIndex)) {
-      this.ui.toast('这个石台已经有防御塔了', 'default');
-      this.audio.play('error');
+    const plot = this.plots[plotIndex];
+    const view = this.world.plotVisuals[plotIndex];
+    if (!plot || !view) return false;
+    if (plot.state === 'tower') {
+      const existing = this.towerAt(plotIndex);
+      if (existing) this.selectTowerObject(existing);
       return false;
     }
+    if (plot.scorched) {
+      this.nudgeError('焦土上不能建塔：先按 E 修复');
+      return false;
+    }
+    if (plot.crop) {
+      const def = CROPS[plot.crop.type];
+      this.nudgeError(plot.crop.mature ? `先收获这块地的${def.name}，再建塔` : `这块地的${def.name}还在长，先等它成熟`);
+      return false;
+    }
+    if (plot.reclaim) return false;
     const def = TOWERS[type];
     if (this.star < def.starCost) {
       this.nudgeError(`星辉不足：${def.name}需要 ${def.starCost} 星辉（种植星辉花获得）`);
@@ -708,16 +905,16 @@ export class Game {
     this.star -= def.starCost;
     const levelDef = def.levels[0];
     const art = this.art.tower(type, 1);
-    art.group.position.set(padSpec.x, 0.02, padSpec.z);
-    art.group.rotation.y = padSpec.rotation;
-    this.world.scene.add(art.group);
+    art.group.position.set(0, 0.2, 0);
+    art.group.rotation.y = 0.35 + ((plotIndex * 1.7) % 6.28);
+    view.group.add(art.group);
     const rangeRing = this.makeRangeRing(def.accent, 0.42);
-    rangeRing.position.set(padSpec.x, 0.34, padSpec.z);
+    rangeRing.position.set(plot.spec.x, 0.36, plot.spec.z);
     rangeRing.scale.setScalar(levelDef.range);
     this.world.scene.add(rangeRing);
     const tower: TowerRuntime = {
       id: type,
-      pad: padSpec,
+      plot: plot.spec,
       level: 1,
       cooldown: 0,
       group: art.group,
@@ -732,13 +929,19 @@ export class Game {
       investedStar: def.starCost,
     };
     this.towers.push(tower);
-    this.world.padVisuals[padIndex].marker.visible = false;
+    const resolved = this.resolvePlayer(this.player.position.x, this.player.position.z);
+    this.player.position.set(resolved.x, 0, resolved.z);
+    plot.underlying = plot.state === 'farmland' ? 'farmland' : 'wild';
+    plot.state = 'tower';
+    plot.crop = null;
+    this.clearCropVisual(view);
+    this.syncPlot(plot);
     this.stats.towersBuilt += 1;
-    this.particles.burstBuild(new Vector3(padSpec.x, 0.35, padSpec.z));
+    this.particles.burstBuild(new Vector3(plot.spec.x, 0.4, plot.spec.z));
     this.audio.play('build');
-    this.ui.toast(`${def.name} 建成！`, 'default');
-    this.selectTowerObject(tower);
+    this.ui.toast(`${def.name} 建成！占用了这块地，拆除后恢复${plot.underlying === 'farmland' ? '农田' : '荒地'}`, 'default');
     this.updateHudNow();
+    this.updateInteractionPrompt();
     return true;
   }
 
@@ -750,19 +953,17 @@ export class Game {
     const goldCost = def.upgradeGold[tower.level - 1];
     const starCost = def.upgradeStar[tower.level - 1];
     if (this.gold < goldCost || this.star < starCost) {
-      this.nudgeError(
-        `升级 ${def.name} 需要 ${goldCost} 金币${starCost ? ` + ${starCost} 星辉` : ''}`,
-      );
+      this.nudgeError(`升级 ${def.name} 需要 ${goldCost} 金币${starCost ? ` + ${starCost} 星辉` : ''}`);
       return false;
     }
     this.gold -= goldCost;
     this.star -= starCost;
-    this.particles.burstBuild(new Vector3(tower.pad.x, 0.6, tower.pad.z));
+    this.particles.burstBuild(new Vector3(tower.plot.x, 0.7, tower.plot.z));
     tower.group.removeFromParent();
     const art = this.art.tower(tower.id, nextLevel);
-    art.group.position.set(tower.pad.x, 0.02, tower.pad.z);
-    art.group.rotation.y = tower.pad.rotation;
-    this.world.scene.add(art.group);
+    art.group.position.set(0, 0.2, 0);
+    art.group.rotation.y = 0.35 + ((tower.plot.index * 1.7) % 6.28);
+    this.world.plotVisuals[tower.plot.index].group.add(art.group);
     tower.group = art.group;
     tower.level = nextLevel;
     const stats = def.levels[nextLevel - 1];
@@ -784,25 +985,35 @@ export class Game {
   }
 
   private sellTower(tower: TowerRuntime) {
+    const plot = this.plots[tower.plot.index];
     const goldRefund = Math.round(tower.investedGold * RULES.sellRefund);
     const starRefund = Math.floor(tower.investedStar * RULES.sellRefund);
     this.gold += goldRefund;
     this.star += starRefund;
     tower.group.removeFromParent();
     tower.rangeRing.removeFromParent();
-    this.world.padVisuals[tower.pad.index].marker.visible = true;
-    this.towers = this.towers.filter((t) => t !== tower);
+    this.towers = this.towers.filter((entry) => entry !== tower);
+    if (plot) {
+      plot.state = plot.underlying;
+      plot.scorched = false;
+      plot.crop = null;
+      this.syncPlot(plot);
+    }
     this.clearTowerSelection();
-    this.particles.spawn(new Vector3(tower.pad.x, 0.5, tower.pad.z), 0xd9c9a8, 10, {
-      speed: 1.6,
-      life: 0.7,
+    this.particles.spawn(new Vector3(tower.plot.x, 0.55, tower.plot.z), 0xd9c9a8, 12, {
+      speed: 1.8,
+      life: 0.75,
       size: 0.09,
       gravity: 4,
-      up: 1.7,
+      up: 1.8,
     });
     this.audio.play('sell');
-    this.ui.toast(`拆除防御塔：+${goldRefund} 金币${starRefund ? ` +${starRefund} 星辉` : ''}`, 'default');
+    this.ui.toast(
+      `拆除防御塔：+${goldRefund} 金币${starRefund ? ` +${starRefund} 星辉` : ''}，地块恢复为${plot?.underlying === 'farmland' ? '农田' : '荒地'}`,
+      'default',
+    );
     this.updateHudNow();
+    this.updateInteractionPrompt();
   }
 
   private upgradeSelectedTower() {
@@ -821,6 +1032,7 @@ export class Game {
     this.ui.setSelectedTool(null);
     this.showTowerInspector(tower);
     this.previewRange.visible = false;
+    this.player.releasePointer();
   }
 
   private clearTowerSelection() {
@@ -853,10 +1065,10 @@ export class Game {
     const refund = Math.round(tower.investedGold * RULES.sellRefund);
     const note =
       tower.level >= 3
-        ? '这座塔已经抵达最高等级。记得留些金币修复被践踏的焦土。'
+        ? `这座塔已经抵达最高等级。拆除后这块地会恢复为${tower.plot.index >= 0 && this.plots[tower.plot.index]?.underlying === 'farmland' ? '农田' : '荒地'}。`
         : upgradeEnabled
           ? `${def.name}会随等级提高伤害与射程。升级同时消耗金币与星辉。`
-          : `还不够升级：需要 ${nextGold} 金币${nextStar ? `和 ${nextStar} 星辉` : ''}。多种星辉花可以补充星辉。`;
+          : `还不够升级：需要 ${nextGold} 金币${nextStar ? ` 和 ${nextStar} 星辉` : ''}。多种星辉花可以补充星辉。`;
     this.ui.showInspector({
       icon: def.icon,
       name: def.name,
@@ -914,7 +1126,7 @@ export class Game {
     const group = art.group;
     const pos = this.world.path.curve.getPointAt(0);
     group.position.set(pos.x, HERO_Y, pos.z);
-    group.userData.lateral = def.boss ? 0 : (Math.random() - 0.5) * 0.95;
+    group.userData.lateral = def.boss ? 0 : (Math.random() - 0.5) * 1.15;
     group.userData.phase = Math.random() * Math.PI * 2;
     group.userData.legs = art.legs;
     group.userData.visual = art.visual;
@@ -975,7 +1187,9 @@ export class Game {
     if (this.wavePhase !== 'active') return;
     this.waveTime += dt;
     while (this.spawnIndex < this.spawnSchedule.length && this.spawnSchedule[this.spawnIndex].at <= this.waveTime) {
-      this.spawnEnemy(this.spawnSchedule[this.spawnIndex].enemy);
+      if (this.enemies.length < RULES.maxEnemies) {
+        this.spawnEnemy(this.spawnSchedule[this.spawnIndex].enemy);
+      }
       this.spawnIndex += 1;
     }
   }
@@ -1101,8 +1315,8 @@ export class Game {
     let best: EnemyRuntime | null = null;
     for (const enemy of this.enemies) {
       if (enemy.dead) continue;
-      const dx = enemy.group.position.x - tower.pad.x;
-      const dz = enemy.group.position.z - tower.pad.z;
+      const dx = enemy.group.position.x - tower.plot.x;
+      const dz = enemy.group.position.z - tower.plot.z;
       if (dx * dx + dz * dz > tower.range * tower.range) continue;
       if (!best || enemy.progress > best.progress) best = enemy;
     }
@@ -1113,10 +1327,10 @@ export class Game {
     const def = TOWERS[tower.id];
     const origin =
       tower.id === 'arrow'
-        ? new Vector3(tower.pad.x, 3.6, tower.pad.z)
+        ? new Vector3(tower.plot.x, 3.6, tower.plot.z)
         : tower.id === 'cannon'
-          ? new Vector3(tower.pad.x, 2.5, tower.pad.z)
-          : new Vector3(tower.pad.x, 3.7, tower.pad.z);
+          ? new Vector3(tower.plot.x, 2.5, tower.plot.z)
+          : new Vector3(tower.plot.x, 3.7, tower.plot.z);
     if (tower.id === 'star') {
       const targetPos = target.group.position.clone().add(new Vector3(0, ENEMIES[target.id].height * 0.6, 0));
       this.fireBeam(origin, targetPos, def.projectileColor);
@@ -1299,7 +1513,7 @@ export class Game {
     this.ui.showBanner(
       `第 ${this.wave} 波清除`,
       `+${reward} 金币${starReward ? ` · +${starReward} 星辉` : ''}`,
-      '准备时间开始，补种、修田、升级防御。',
+      '准备时间开始：开垦新地、补种、到地块上建塔。',
       false,
       3200,
     );
@@ -1309,231 +1523,298 @@ export class Game {
     this.updateHudNow();
   }
 
-  /* ───────────────────────────── input ───────────────────────────── */
+  /* ───────────────────────────── interaction ───────────────────────────── */
 
-  private bindInput() {
-    this.canvas.addEventListener('pointerdown', this.onPointerDown, { capture: true });
-    this.canvas.addEventListener('pointermove', this.onPointerMove);
-    this.canvas.addEventListener('pointerup', this.onPointerUp);
-    this.canvas.addEventListener('pointercancel', this.onPointerUp);
-    this.canvas.addEventListener('pointerleave', this.onPointerLeave);
+  private inReach(plot: PlotRuntime) {
+    const dx = plot.spec.x - this.player.position.x;
+    const dz = plot.spec.z - this.player.position.z;
+    return Math.hypot(dx, dz) <= WORLD.player.interactRange;
   }
 
-  private onPointerDown = (event: PointerEvent) => {
-    if (this.phase !== 'playing' || event.button !== 0) return;
-    const pick = this.world.pick(event.clientX, event.clientY);
-    this.pointer = {
-      downX: event.clientX,
-      downY: event.clientY,
-      time: performance.now(),
-      pick,
-      acted: false,
-      painting: false,
-      pointerId: event.pointerId,
-      pointerType: event.pointerType,
-    };
+  private findTargetPlot(): PlotRuntime | null {
+    if (this.phase !== 'playing' || this.mode !== 'first') return null;
+    const hit = this.world.pickAtNdc(0, 0);
+    if (hit) {
+      const plot = this.plots[hit.index];
+      if (plot && this.inReach(plot)) return plot;
+    }
+    const eye = this.player.eyePosition(new Vector3());
+    const direction = this.world.camera.getWorldDirection(new Vector3());
+    let best: PlotRuntime | null = null;
+    let bestScore = -Infinity;
+    for (const plot of this.plots) {
+      const dx = plot.spec.x - this.player.position.x;
+      const dz = plot.spec.z - this.player.position.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance > WORLD.player.interactRange) continue;
+      const height = plot.state === 'tower' ? 1.25 : 0.5;
+      const toTarget = new Vector3(plot.spec.x, height, plot.spec.z).sub(eye).normalize();
+      const dot = toTarget.dot(direction);
+      if (dot < 0.05) continue;
+      const score = dot * 2 - distance * 0.12;
+      if (score > bestScore) {
+        bestScore = score;
+        best = plot;
+      }
+    }
+    return best;
+  }
+
+  private promptFor(plot: PlotRuntime | null): InteractPrompt | null {
+    if (!plot) return null;
     const tool = this.selectedTool;
-    const toolMatches =
-      tool !== null &&
-      pick !== null &&
-      ((tool.kind === 'crop' && pick.kind === 'plot') || (tool.kind === 'tower' && pick.kind === 'pad'));
-    if (!toolMatches || !pick) return;
-    this.world.controls.enabled = false;
-    this.pointer.acted = true;
-    this.pointer.painting = tool.kind === 'crop' && event.pointerType === 'mouse';
-    if (this.pointer.painting) {
-      this.lastPaintPlot = -1;
-      this.canvas.setPointerCapture(event.pointerId);
+    if (plot.reclaim) {
+      const progress = Math.min(1, plot.reclaim.elapsed / plot.reclaim.total);
+      return {
+        key: '',
+        title: '开垦中…',
+        detail: '铁锹在翻土，稍等片刻',
+        tone: 'work',
+        progress,
+        actionable: false,
+      };
     }
-    this.handleTap(pick, event.clientX, event.clientY);
-    if (this.pointer?.painting && pick.kind === 'plot') this.lastPaintPlot = pick.index;
-  };
-
-  private onPointerMove = (event: PointerEvent) => {
-    if (this.phase !== 'playing') return;
-    if (this.pointer?.painting) {
-      const pick = this.world.pick(event.clientX, event.clientY);
-      if (pick?.kind === 'plot' && pick.index !== this.lastPaintPlot) {
-        this.lastPaintPlot = pick.index;
-        const plot = this.plots[pick.index];
-        if (plot.unlocked && !plot.scorched && !plot.crop) this.plantPlot(pick.index);
+    if (plot.state === 'wild') {
+      if (tool?.kind === 'tower') {
+        const def = TOWERS[tool.id as TowerId];
+        return {
+          key: 'E',
+          title: `在荒地上建 ${def.name}`,
+          detail: `${def.starCost ? `${def.starCost} 星辉 + ` : ''}${def.cost} 金币 · 建塔后不能种作物`,
+          tone: 'action',
+          actionable: true,
+        };
       }
-      return;
+      return {
+        key: 'E',
+        title: '开垦这块荒地',
+        detail: `${this.reclaimCost()} 金币 · 开垦后可以播种`,
+        tone: 'action',
+        actionable: true,
+      };
     }
-    if (event.pointerType !== 'mouse') return;
-    this.updateHover(event.clientX, event.clientY);
-  };
-
-  private onPointerUp = (event: PointerEvent) => {
-    if (!this.pointer) {
-      this.world.controls.enabled = true;
-      return;
+    if (plot.state === 'tower') {
+      const tower = this.towerAt(plot.spec.index);
+      if (!tower) return null;
+      const def = TOWERS[tower.id];
+      return {
+        key: 'E',
+        title: `查看 ${def.name} Lv.${tower.level}`,
+        detail: '打开面板升级或拆除，拆除后恢复地块',
+        tone: 'info',
+        actionable: true,
+      };
     }
-    const state = this.pointer;
-    const moved = Math.hypot(event.clientX - state.downX, event.clientY - state.downY);
-    if (!state.acted && moved < 7 && performance.now() - state.time < 900) {
-      const pick = this.world.pick(event.clientX, event.clientY);
-      if (pick) this.handleTap(pick, event.clientX, event.clientY);
-      else {
-        this.clearTowerSelection();
-        this.ui.hideTooltip();
+    if (plot.scorched) {
+      return {
+        key: 'E',
+        title: '修复焦土',
+        detail: `${WORLD.farm.repairCost} 金币 · 修复后才能重新播种`,
+        tone: 'warn',
+        actionable: true,
+      };
+    }
+    if (plot.crop) {
+      const def = CROPS[plot.crop.type];
+      if (plot.crop.mature) {
+        return {
+          key: 'E',
+          title: `收获 ${def.name}`,
+          detail: `+${def.yieldGold} 金币${def.yieldStar ? ` +${def.yieldStar} 星辉` : ''}`,
+          tone: 'action',
+          actionable: true,
+        };
       }
+      const pct = Math.min(99, Math.floor((plot.crop.elapsed / def.growTime) * 100));
+      return {
+        key: '',
+        title: `${def.name} · 生长中`,
+        detail: `${pct}% · 还需 ${Math.max(0, def.growTime - plot.crop.elapsed).toFixed(1)} 秒`,
+        tone: 'info',
+        actionable: false,
+      };
     }
-    if (state.painting) {
-      try {
-        this.canvas.releasePointerCapture(state.pointerId);
-      } catch {
-        // Pointer capture may already be gone on touch cancellation.
-      }
+    if (tool?.kind === 'tower') {
+      const def = TOWERS[tool.id as TowerId];
+      return {
+        key: 'E',
+        title: `在空农田上建 ${def.name}`,
+        detail: `${def.starCost ? `${def.starCost} 星辉 + ` : ''}${def.cost} 金币 · 会占用这块农田`,
+        tone: 'action',
+        actionable: true,
+      };
     }
-    this.pointer = null;
-    this.world.controls.enabled = true;
-    void event;
-  };
-
-  private onPointerLeave = () => {
-    if (this.pointer?.painting) return;
-    this.clearHover();
-  };
-
-  private handleTap(pick: { kind: 'plot' | 'pad'; index: number }, clientX: number, clientY: number) {
-    if (pick.kind === 'plot') this.handlePlotTap(pick.index);
-    else this.handlePadTap(pick.index);
-    if (this.phase === 'playing') this.updateHover(clientX, clientY);
+    if (tool?.kind === 'crop') {
+      const def = CROPS[tool.id as CropId];
+      return {
+        key: 'E',
+        title: `播种 ${def.name}`,
+        detail: `${def.cost} 金币 · ${def.growTime} 秒成熟 · +${def.yieldGold} 金币${def.yieldStar ? ` +${def.yieldStar} 星辉` : ''}`,
+        tone: 'action',
+        actionable: true,
+      };
+    }
+    return {
+      key: '',
+      title: '空农田',
+      detail: '按 1–3 选作物，或 4–6 选防御塔',
+      tone: 'info',
+      actionable: false,
+    };
   }
 
-  private handlePlotTap(index: number) {
-    if (this.phase !== 'playing') return;
-    const plot = this.plots[index];
-    if (!plot) return;
-    if (!plot.unlocked) {
-      this.tryUnlock(index);
+  private updateInteractionPrompt() {
+    if (this.phase !== 'playing' || this.mode !== 'first') {
+      this.targetPlot = null;
+      this.ui.setInteractPrompt(null);
+      return;
+    }
+    const plot = this.findTargetPlot();
+    if (plot !== this.targetPlot) {
+      this.clearTargetPlot();
+      this.targetPlot = plot;
+      if (plot) this.viewFor(plot.spec.index).highlight.visible = true;
+    }
+    if (plot && this.selectedTool?.kind === 'tower' && plot.state !== 'tower' && !plot.scorched && !plot.reclaim && !plot.crop) {
+      const def = TOWERS[this.selectedTool.id as TowerId];
+      this.previewRange.position.set(plot.spec.x, 0.36, plot.spec.z);
+      this.previewRange.scale.setScalar(def.levels[0].range);
+      (this.previewRange.material as MeshBasicMaterial).color.setHex(def.accent);
+      this.previewRange.visible = true;
+    } else {
+      this.previewRange.visible = false;
+    }
+    this.ui.setInteractPrompt(this.promptFor(plot));
+    this.ui.setTouchInteractEnabled(!!plot && !!this.promptFor(plot)?.actionable);
+  }
+
+  private clearTargetPlot() {
+    if (!this.targetPlot) return;
+    this.viewFor(this.targetPlot.spec.index).highlight.visible = false;
+    this.targetPlot = null;
+    this.previewRange.visible = false;
+  }
+
+  private interact() {
+    if (this.phase !== 'playing' || this.mode !== 'first') return;
+    const plot = this.findTargetPlot();
+    if (!plot) {
+      this.ui.toast('走近地块再操作（WASD 移动）', 'default');
+      return;
+    }
+    this.targetPlot = plot;
+    this.player.swing();
+    if (plot.reclaim) return;
+    if (plot.state === 'tower') {
+      const tower = this.towerAt(plot.spec.index);
+      if (tower) this.selectTowerObject(tower);
+      return;
+    }
+    if (plot.state === 'wild') {
+      if (this.selectedTool?.kind === 'tower') this.buildTower(plot.spec.index, this.selectedTool.id as TowerId);
+      else this.startReclaim(plot.spec.index);
+      this.updateInteractionPrompt();
       return;
     }
     if (plot.scorched) {
-      this.repairPlot(index);
+      this.repairPlot(plot.spec.index);
+      this.updateInteractionPrompt();
       return;
     }
     if (plot.crop) {
-      if (plot.crop.mature) {
-        this.harvestPlot(index);
-      } else if (this.selectedTool?.kind === 'crop') {
-        this.ui.toast('作物还在生长，成熟后点击收获', 'default');
-      } else {
-        this.ui.toast(`${CROPS[plot.crop.type].name}正在生长，成熟后点击收获`, 'default');
-      }
-      return;
-    }
-    if (this.selectedTool?.kind === 'crop') {
-      this.plantPlot(index);
-    } else {
-      this.ui.toast('先在下方选择一种作物，再点击空地播种', 'default');
-    }
-  }
-
-  private handlePadTap(index: number) {
-    if (this.phase !== 'playing') return;
-    const tower = this.towerAtPad(index);
-    if (tower) {
-      this.selectTowerObject(tower);
+      if (plot.crop.mature) this.harvestPlot(plot.spec.index);
+      else this.ui.toast(`${CROPS[plot.crop.type].name}还在生长`, 'default');
+      this.updateInteractionPrompt();
       return;
     }
     if (this.selectedTool?.kind === 'tower') {
-      this.buildTowerAt(index, this.selectedTool.id as TowerId);
+      this.buildTower(plot.spec.index, this.selectedTool.id as TowerId);
+    } else if (this.selectedTool?.kind === 'crop') {
+      this.plantCrop(plot.spec.index, this.selectedTool.id as CropId);
     } else {
-      this.clearTowerSelection();
-      this.ui.toast('先在下方选择防御塔，再点击石台建造', 'default');
+      this.ui.toast('先在下方选一种作物或防御塔，再按 E', 'default');
     }
+    this.updateInteractionPrompt();
   }
 
-  private updateHover(clientX: number, clientY: number) {
-    if (this.phase !== 'playing') return;
-    const pick = this.world.pick(clientX, clientY);
-    if (!pick) {
-      this.clearHover();
-      return;
-    }
-    if (this.hovered?.kind === pick.kind && this.hovered.index === pick.index) {
-      this.positionTooltip(pick, clientX, clientY);
-      return;
-    }
-    this.clearHover();
-    this.hovered = pick;
-    if (pick.kind === 'plot') {
-      const view = this.viewFor(pick.index);
-      view.highlight.visible = true;
-      this.setPreviewRange(false);
-    } else {
-      const view = this.world.padVisuals[pick.index];
-      view.highlight.visible = true;
-      const tower = this.towerAtPad(pick.index);
-      if (!tower && this.selectedTool?.kind === 'tower') {
-        this.previewRange.position.set(view.spec.x, 0.34, view.spec.z);
-        this.previewRange.scale.setScalar(TOWERS[this.selectedTool.id as TowerId].levels[0].range);
-        this.previewRange.visible = true;
-      } else {
-        this.previewRange.visible = false;
+  private handleOverviewClick(clientX: number, clientY: number) {
+    if (this.phase !== 'playing' || this.mode !== 'overview') return;
+    const hit = this.world.pick(clientX, clientY);
+    if (hit) {
+      const plot = this.plots[hit.index];
+      const tower = plot ? this.towerAt(plot.spec.index) : null;
+      if (tower) {
+        this.selectTowerObject(tower);
+        return;
       }
     }
-    this.positionTooltip(pick, clientX, clientY);
+    this.ui.toast('切回第一人称（V），走到地块旁才能开垦、播种或建塔', 'default');
   }
 
-  private positionTooltip(pick: { kind: 'plot' | 'pad'; index: number }, x: number, y: number) {
-    const html = pick.kind === 'plot' ? this.plotTooltip(pick.index) : this.padTooltip(pick.index);
-    if (!html) {
+  private updateOverviewHover() {
+    if (this.phase !== 'playing' || this.mode !== 'overview') {
+      this.clearOverviewHover();
+      return;
+    }
+    const hit = this.world.pick(this.lastPointer.x, this.lastPointer.y);
+    const plot = hit ? this.plots[hit.index] : null;
+    if (plot !== this.hoveredPlot) {
+      this.clearOverviewHover();
+      this.hoveredPlot = plot;
+      if (plot) this.viewFor(plot.spec.index).highlight.visible = true;
+    }
+    if (!plot) {
       this.ui.hideTooltip();
+      this.previewRange.visible = false;
       return;
     }
-    this.ui.showTooltip(html, x, y);
-  }
-
-  private plotTooltip(index: number) {
-    const plot = this.plots[index];
-    if (!plot) return '';
-    if (!plot.unlocked) return `<b>未开垦的农田</b><br>点击花 <b>${this.unlockCost(index)} 金币</b>开垦`;
-    if (plot.scorched) return `<b>焦土</b><br>点击花 <b>${WORLD.farm.repairCost} 金币</b>修复`;
-    if (!plot.crop) {
-      const def = this.selectedTool?.kind === 'crop' ? CROPS[this.selectedTool.id as CropId] : null;
-      if (def) return `<b>${def.name}</b><br>点击播种 · ${def.cost} 金币<br>${def.growTime} 秒成熟 · +${def.yieldGold} 金币${def.yieldStar ? ` +${def.yieldStar} 星辉` : ''}`;
-      return '<b>空农田</b><br>先在下方选择一种作物';
-    }
-    const def = CROPS[plot.crop.type];
-    if (plot.crop.mature) {
-      return `<b>${def.name} · 成熟</b><br>点击收获 · +${def.yieldGold} 金币${def.yieldStar ? ` +${def.yieldStar} 星辉` : ''}`;
-    }
-    const pct = Math.min(99, Math.floor((plot.crop.elapsed / def.growTime) * 100));
-    const left = Math.max(0, def.growTime - plot.crop.elapsed);
-    return `<b>${def.name} · 生长中</b><br>${pct}% · 还需 ${left.toFixed(1)} 秒`;
-  }
-
-  private padTooltip(index: number) {
-    const tower = this.towerAtPad(index);
-    if (tower) {
-      const def = TOWERS[tower.id];
-      return `<b>${def.name} · Lv.${tower.level}</b><br>点击查看属性与升级`;
-    }
-    if (this.selectedTool?.kind === 'tower') {
+    this.ui.showTooltip(this.plotTooltip(plot), this.lastPointer.x, this.lastPointer.y);
+    const tower = this.towerAt(plot.spec.index);
+    if (this.selectedTool?.kind === 'tower' && !tower && plot.state !== 'tower' && !plot.scorched && !plot.crop && !plot.reclaim) {
       const def = TOWERS[this.selectedTool.id as TowerId];
-      return `<b>建造 ${def.name}</b><br>${def.cost} 金币${def.starCost ? ` · ${def.starCost} 星辉` : ''}<br>${def.description}`;
+      this.previewRange.position.set(plot.spec.x, 0.36, plot.spec.z);
+      this.previewRange.scale.setScalar(def.levels[0].range);
+      (this.previewRange.material as MeshBasicMaterial).color.setHex(def.accent);
+      this.previewRange.visible = true;
+    } else {
+      this.previewRange.visible = false;
     }
-    return '<b>空石台</b><br>选择防御塔后点击建造';
   }
 
-  private setPreviewRange(visible: boolean) {
-    this.previewRange.visible = visible;
-  }
-
-  private clearHover() {
-    for (const view of this.world.plotVisuals) view.highlight.visible = false;
-    for (const view of this.world.padVisuals) view.highlight.visible = false;
-    this.hovered = null;
+  private clearOverviewHover() {
+    if (this.hoveredPlot) this.viewFor(this.hoveredPlot.spec.index).highlight.visible = false;
+    this.hoveredPlot = null;
     this.previewRange.visible = false;
     this.ui.hideTooltip();
   }
 
+  private plotTooltip(plot: PlotRuntime) {
+    const tool = this.selectedTool;
+    if (plot.reclaim) return `<b>开垦中</b><br>${Math.floor(Math.min(1, plot.reclaim.elapsed / plot.reclaim.total) * 100)}% · 还需约 ${Math.max(0, plot.reclaim.total - plot.reclaim.elapsed).toFixed(1)} 秒`;
+    if (plot.state === 'wild') {
+      if (tool?.kind === 'tower') {
+        const def = TOWERS[tool.id as TowerId];
+        return `<b>荒地 · 建 ${def.name}</b><br>${def.starCost ? `${def.starCost} 星辉 + ` : ''}${def.cost} 金币<br>第一人称走到近处按 E`;
+      }
+      return `<b>荒地</b><br>开垦需要 ${this.reclaimCost()} 金币<br>第一人称走到近处按 E`;
+    }
+    if (plot.state === 'tower') {
+      const tower = this.towerAt(plot.spec.index);
+      const def = tower ? TOWERS[tower.id] : null;
+      return `<b>塔基 · ${def?.name ?? '防御塔'}${tower ? ` Lv.${tower.level}` : ''}</b><br>拆除后恢复为${plot.underlying === 'farmland' ? '农田' : '荒地'}`;
+    }
+    if (plot.scorched) return `<b>焦土</b><br>修复需要 ${WORLD.farm.repairCost} 金币`;
+    if (plot.crop) {
+      const def = CROPS[plot.crop.type];
+      if (plot.crop.mature) return `<b>${def.name} · 成熟</b><br>可收获 +${def.yieldGold} 金币${def.yieldStar ? ` +${def.yieldStar} 星辉` : ''}`;
+      return `<b>${def.name} · 生长中</b><br>${Math.min(99, Math.floor((plot.crop.elapsed / def.growTime) * 100))}%`;
+    }
+    return '<b>空农田</b><br>第一人称走到近处按 E 播种';
+  }
+
   private clearHighlights() {
     for (const view of this.world.plotVisuals) view.highlight.visible = false;
-    for (const view of this.world.padVisuals) view.highlight.visible = false;
+    this.previewRange.visible = false;
   }
 
   private nudgeError(message: string) {
@@ -1555,7 +1836,7 @@ export class Game {
       this.clearTowerSelection();
     }
     this.audio.play('click');
-    this.updateHoverFromPointer();
+    this.updateInteractionPrompt();
   }
 
   private selectTower(id: TowerId) {
@@ -1569,11 +1850,22 @@ export class Game {
       this.clearTowerSelection();
     }
     this.audio.play('click');
-    this.updateHoverFromPointer();
+    this.updateInteractionPrompt();
   }
 
-  private updateHoverFromPointer() {
-    this.clearHover();
+  /* ───────────────────────────── input ───────────────────────────── */
+
+  private bindInput() {
+    this.canvas.addEventListener('pointermove', (event) => {
+      this.lastPointer = { x: event.clientX, y: event.clientY };
+      if (this.mode === 'overview') this.updateOverviewHover();
+    });
+    this.canvas.addEventListener('click', (event) => {
+      if (this.mode === 'overview') this.handleOverviewClick(event.clientX, event.clientY);
+    });
+    this.canvas.addEventListener('pointerleave', () => {
+      if (this.mode === 'overview') this.clearOverviewHover();
+    });
   }
 
   private bindKeyboard() {
@@ -1589,11 +1881,11 @@ export class Game {
         if (helpOpen) this.ui.hideHelp();
         else if (pauseOpen) this.resumeGame();
         else if (endOpen) this.goToMenu();
+        else if (this.selectedTower) this.clearTowerSelection();
         else if (this.selectedTool) {
           this.selectedTool = null;
           this.ui.setSelectedTool(null);
-        } else if (this.selectedTower) {
-          this.clearTowerSelection();
+          this.updateInteractionPrompt();
         } else if (this.phase === 'playing') {
           this.togglePause();
         }
@@ -1608,13 +1900,19 @@ export class Game {
         return;
       }
       if (this.phase !== 'playing') return;
-      if (event.code === 'Space') {
-        event.preventDefault();
-        if (this.wavePhase === 'prep') this.startNextWave(true);
-        return;
-      }
-      if (event.code === 'Escape') return;
       switch (event.code) {
+        case 'KeyE':
+          event.preventDefault();
+          this.interact();
+          break;
+        case 'KeyV':
+          event.preventDefault();
+          this.toggleCameraMode();
+          break;
+        case 'Enter':
+          event.preventDefault();
+          if (this.wavePhase === 'prep') this.startNextWave(true);
+          break;
         case 'Digit1':
           this.selectCrop('wheat');
           break;
@@ -1632,9 +1930,6 @@ export class Game {
           break;
         case 'Digit6':
           this.selectTower('star');
-          break;
-        case 'KeyH':
-          this.harvestAll();
           break;
         case 'KeyT':
           this.toggleSpeed();
@@ -1663,6 +1958,7 @@ export class Game {
     const dt = Math.min(0.1, Math.max(0, (now - this.lastTime) / 1000));
     this.lastTime = now;
     this.world.updateAmbient(dt);
+    this.player.update(dt);
     if (this.phase === 'playing' && !this.debugHold) {
       this.accumulator += dt * this.speed;
       let steps = 0;
@@ -1678,18 +1974,35 @@ export class Game {
         this.updateHudNow();
       }
     }
+    if (this.phase === 'playing') {
+      this.promptTimer += dt;
+      if (this.promptTimer >= 0.05) {
+        this.promptTimer = 0;
+        this.updateInteractionPrompt();
+      }
+    }
     this.particles.update(dt);
     this.floaters.update(dt, this.world.camera);
     if (this.phase === 'playing' || this.phase === 'paused') this.updateEnemyBars();
+    this.syncControlUi();
     this.ui.tickFps(dt);
     this.world.render();
     requestAnimationFrame(this.loop);
   };
 
+  private syncControlUi() {
+    const locked = this.player.isLocked;
+    const showLockHint = this.phase === 'playing' && this.mode === 'first' && !locked && !this.isTouchDevice;
+    this.ui.setLockHint(showLockHint);
+    this.canvas.classList.toggle('is-locked', locked);
+    const showTouch = this.phase === 'playing' && this.mode === 'first' && this.isTouchDevice && !this.ui.inspectorOpen;
+    this.ui.setTouchControlsVisible(showTouch);
+  }
+
   private step(dt: number) {
     this.stats.playSeconds += dt;
     this.updateWave(dt);
-    this.updateCrops(dt);
+    this.updatePlots(dt);
     this.updateEnemies(dt);
     this.cleanupEnemies();
     if (this.phase !== 'playing') return;
@@ -1725,7 +2038,7 @@ export class Game {
   }
 
   private updateHudNow() {
-    this.ui.setResources(this.gold, this.star, this.lives, RULES.startingLives);
+    this.ui.setResources(this.gold, this.star, this.lives, RULES.startingLives, this.reclaimedCount(), this.plots.length);
     if (this.phase !== 'playing' && this.phase !== 'paused') return;
     const previewWave =
       this.wavePhase === 'prep'
@@ -1777,19 +2090,25 @@ export class Game {
     }
     this.beams = [];
     for (const view of this.world.plotVisuals) {
-      while (view.cropAnchor.children.length) view.cropAnchor.children[0].removeFromParent();
-      view.locked.visible = true;
+      this.clearCropVisual(view);
+      view.wild.visible = true;
+      view.farm.visible = false;
+      view.towerBase.visible = false;
       view.scorched.visible = false;
       view.matureGlow.visible = false;
       view.highlight.visible = false;
+      view.wild.scale.setScalar(1);
+      view.wild.position.set(0, 0, 0);
+      view.farm.scale.setScalar(1);
+      view.farm.position.set(0, 0, 0);
     }
-    for (const view of this.world.padVisuals) {
-      view.highlight.visible = false;
-      view.marker.visible = true;
-    }
+    this.activeReclaim = null;
+    this.targetPlot = null;
     this.selectedTower = null;
     this.ui.hideInspector();
-    this.clearHover();
+    this.ui.setInteractPrompt(null);
+    this.clearHighlights();
+    this.clearOverviewHover();
   }
 
   /* ───────────────────────────── debug API ───────────────────────────── */
@@ -1798,7 +2117,7 @@ export class Game {
     if (!new URLSearchParams(window.location.search).has('debug')) return;
     const game = this;
     const api = {
-      version: '1.0.0',
+      version: '2.0.0',
       art: game.art.kind,
       get ready() {
         return game.phase !== 'loading';
@@ -1806,6 +2125,7 @@ export class Game {
       getState() {
         return {
           phase: game.phase,
+          mode: game.mode,
           gold: game.gold,
           star: game.star,
           lives: game.lives,
@@ -1814,6 +2134,19 @@ export class Game {
           prepRemaining: game.prepRemaining,
           speed: game.speed,
           selectedTool: game.selectedTool,
+          selectedTower: game.selectedTower ? { plot: game.selectedTower.plot.index, level: game.selectedTower.level } : null,
+          player: {
+            x: game.player.position.x,
+            z: game.player.position.z,
+            yaw: game.player.yaw,
+            pitch: game.player.pitch,
+            mode: game.player.mode,
+            locked: game.player.isLocked,
+            jumpY: game.player.jumpYForDebug,
+            grounded: game.player.groundedForDebug,
+          },
+          cameraMode: game.mode,
+          reclaimCost: game.reclaimCost(),
           enemies: game.enemies.map((enemy) => {
             const tangent = game.world.path.curve.getTangentAt(Math.min(0.9999, enemy.progress));
             const head = enemy.group.userData.head as Object3D | null;
@@ -1825,17 +2158,16 @@ export class Game {
               const length = Math.hypot(dx, dz);
               if (length > 0.0001) facing = (dx * tangent.x + dz * tangent.z) / length;
             }
-            return {
-              id: enemy.id,
-              hp: enemy.hp,
-              progress: enemy.progress,
-              facing,
-            };
+            return { id: enemy.id, hp: enemy.hp, progress: enemy.progress, facing };
           }),
           plots: game.plots.map((plot) => ({
             index: plot.spec.index,
-            unlocked: plot.unlocked,
+            state: plot.state,
+            underlying: plot.underlying,
             scorched: plot.scorched,
+            reclaim: plot.reclaim
+              ? { progress: Math.min(1, plot.reclaim.elapsed / plot.reclaim.total) }
+              : null,
             crop: plot.crop
               ? {
                   type: plot.crop.type,
@@ -1847,12 +2179,13 @@ export class Game {
           })),
           towers: game.towers.map((tower) => ({
             id: tower.id,
-            pad: tower.pad.index,
+            plot: tower.plot.index,
             level: tower.level,
             damage: tower.damage,
             range: tower.range,
           })),
           stats: { ...game.stats },
+          pathLength: game.world.path.length,
         };
       },
       start() {
@@ -1868,13 +2201,14 @@ export class Game {
         const limit = Math.min(cleanNumber(seconds), 600);
         let remaining = limit;
         let guard = 0;
-        while (remaining > 0 && game.phase === 'playing' && guard < 40000) {
+        while (remaining > 0 && game.phase === 'playing' && guard < 60000) {
           const dt = Math.min(RULES.simStep, remaining);
           game.step(dt);
           remaining -= dt;
           guard++;
         }
         game.updateHudNow();
+        game.updateInteractionPrompt();
         game.world.updateAmbient(0.016);
         game.world.render();
         return game.debugState();
@@ -1901,10 +2235,7 @@ export class Game {
         return game.selectedTool;
       },
       plant(index: number, type: CropId = 'wheat') {
-        return game.plantCrop(index, type, false);
-      },
-      plantSelected(index: number) {
-        return game.plantPlot(index);
+        return game.plantCrop(index, type);
       },
       harvest(index: number) {
         return game.harvestPlot(index);
@@ -1913,18 +2244,56 @@ export class Game {
         game.harvestAll();
         return game.gold;
       },
-      build(pad: number, type: TowerId) {
-        return game.buildTowerAt(pad, type);
+      reclaim(index: number) {
+        return game.startReclaim(index);
       },
-      upgrade(pad: number) {
-        const tower = game.towerAtPad(pad);
+      repair(index: number) {
+        return game.repairPlot(index);
+      },
+      finishReclaim(index: number) {
+        const plot = game.plots[index];
+        if (!plot?.reclaim) return false;
+        game.finishReclaim(plot);
+        return true;
+      },
+      build(plot: number, type: TowerId) {
+        return game.buildTower(plot, type);
+      },
+      upgrade(plot: number) {
+        const tower = game.towerAt(plot);
         return tower ? game.upgradeTower(tower) : false;
       },
-      sell(pad: number) {
-        const tower = game.towerAtPad(pad);
+      sell(plot: number) {
+        const tower = game.towerAt(plot);
         if (!tower) return false;
         game.sellTower(tower);
         return true;
+      },
+      interact() {
+        game.interact();
+      },
+      toggleCamera() {
+        game.toggleCameraMode();
+      },
+      teleport(x: number, z: number) {
+        game.player.position.set(x, 0, z);
+        game.player.lookAt(new Vector3(x, 0.6, z));
+        game.player.eyePosition();
+        game.world.render();
+        return { x: game.player.position.x, z: game.player.position.z };
+      },
+      facePlot(index: number, standDistance = 2.35) {
+        const spec = PLOTS[index];
+        const x = spec.x;
+        const z = spec.z + standDistance;
+        game.player.position.set(x, 0, z);
+        game.player.lookAt(new Vector3(spec.x, 0.5, spec.z));
+        game.world.render();
+        return { x, z };
+      },
+      setLook(yaw: number, pitch: number) {
+        game.player.setLook(yaw, pitch);
+        game.world.render();
       },
       nextWave() {
         game.startNextWave(false);
@@ -1941,17 +2310,22 @@ export class Game {
         game.clearTowerSelection();
       },
       setCamera(position: [number, number, number], target: [number, number, number]) {
+        game.world.setCameraMode('orbit');
         game.world.camera.position.set(...position);
         game.world.controls.target.set(...target);
         game.world.controls.update();
         game.world.render();
+        if (game.mode !== 'overview') {
+          game.mode = 'overview';
+          game.player.setMode('overview');
+          game.player.setEnabled(false);
+          game.ui.setCameraMode('overview');
+        }
       },
       screenPoint(kind: 'plot' | 'pad', index: number) {
-        const point =
-          kind === 'plot'
-            ? new Vector3(PLOTS[index].x, 0.5, PLOTS[index].z)
-            : new Vector3(TOWER_PADS[index].x, 0.5, TOWER_PADS[index].z);
-        return game.world.screenPoint(point);
+        void kind;
+        const spec = PLOTS[index];
+        return game.world.screenPoint(new Vector3(spec.x, 0.5, spec.z));
       },
       metrics() {
         return {
@@ -1961,9 +2335,12 @@ export class Game {
           pixelRatio: game.world.renderer.getPixelRatio(),
           width: window.innerWidth,
           height: window.innerHeight,
+          mode: game.mode,
+          player: { x: game.player.position.x, z: game.player.position.z, yaw: game.player.yaw, pitch: game.player.pitch },
           camera: {
             position: game.world.camera.position.toArray(),
             target: game.world.controls.target.toArray(),
+            fov: game.world.camera.fov,
             distance: game.world.camera.position.distanceTo(game.world.controls.target),
           },
         };

@@ -16,6 +16,16 @@
       <div id="scene-shell">
         <canvas id="scene" aria-label="穗守 3D 游戏场景"></canvas>
         <div class="vignette" aria-hidden="true"></div>
+        <div id="crosshair" class="crosshair" aria-hidden="true" hidden><i></i></div>
+        <div id="lock-hint" class="lock-hint" hidden>点击画面锁定鼠标 · <b>WASD</b> 移动 · <b>E</b> 交互 · <b>V</b> 俯瞰</div>
+        <div id="interact-prompt" class="interact-prompt" aria-live="polite" hidden>
+          <kbd id="interact-key">E</kbd>
+          <div class="interact-copy">
+            <b id="interact-title"></b>
+            <small id="interact-detail"></small>
+          </div>
+          <div class="interact-progress" id="interact-progress" hidden><i id="interact-progress-fill"></i></div>
+        </div>
         <div id="float-layer" aria-hidden="true"></div>
         <div id="enemy-bar-layer" aria-hidden="true"></div>
       </div>
@@ -36,6 +46,9 @@
             <div class="chip chip-life" title="生命：漏怪会损失生命并践踏农田">
               <span class="chip-icon">♥</span><b id="stat-lives">20</b>
             </div>
+            <div class="chip chip-farm" title="已开垦农田 / 可开垦地块总数">
+              <span class="chip-icon">🌱</span><b id="stat-farm">0/24</b>
+            </div>
           </div>
         </div>
 
@@ -54,6 +67,7 @@
 
         <div class="hud-right">
           <span id="fps-badge" class="fps-badge" title="渲染帧率">60 FPS</span>
+          <button class="icon-btn icon-btn-wide" id="btn-camera" type="button" title="切换到俯瞰视角 (V)" aria-label="切换视角">👁 俯瞰</button>
           <button class="icon-btn" id="btn-speed" type="button" title="切换游戏速度 (T)" aria-label="切换游戏速度">1×</button>
           <button class="icon-btn" id="btn-sound" type="button" title="音效开关 (M)" aria-label="音效开关">♪</button>
           <button class="icon-btn" id="btn-help" type="button" title="玩法与操作 (H)" aria-label="玩法与操作">?</button>
@@ -102,15 +116,20 @@
           </section>
 
           <div class="tool-utility">
-            <button class="utility-btn" type="button" id="btn-harvest-all" title="收获所有成熟作物 (H)">
-              <span>收获全部</span><kbd>H</kbd>
-            </button>
             <button class="utility-btn utility-next" type="button" id="btn-next-wave" title="提前迎接下一波，获得额外金币">
-              <span id="btn-next-label">提前迎战</span><kbd>Space</kbd>
+              <span id="btn-next-label">提前迎战</span><kbd>Enter</kbd>
             </button>
           </div>
         </div>
-        <div class="context-hint" id="context-hint">选择作物后点击农田播种，拖动可连续播种</div>
+        <div class="context-hint" id="context-hint">WASD 移动 · 鼠标看 · E 开垦/播种/收获/建塔 · V 俯瞰视角</div>
+      </div>
+
+      <div id="touch-controls" class="touch-controls" hidden aria-label="触屏操作">
+        <div id="joystick" class="joystick" aria-label="移动摇杆">
+          <span class="joystick-ring" aria-hidden="true"></span>
+          <span id="joystick-knob" class="joystick-knob" aria-hidden="true"></span>
+        </div>
+        <button id="btn-interact" class="touch-interact" type="button" disabled>交互</button>
       </div>
 
       <aside id="inspector" class="inspector" hidden aria-live="polite">
@@ -141,7 +160,7 @@
           <p>正在开垦山野、唤醒守望者…</p>
           <div class="loading-track"><i id="loading-fill"></i></div>
           <span class="loading-note" id="loading-note">载入低多边形世界</span>
-          <span class="loading-tip">提示：星辉花是解锁高阶防御的钥匙。</span>
+          <span class="loading-tip">提示：塔基会占用地块，拆除后地块恢复原状。</span>
         </div>
       </section>
 
@@ -157,14 +176,14 @@
             <button class="btn-ghost" id="btn-howto" type="button">玩法与操作</button>
           </div>
           <ul class="menu-points">
-            <li><i>01</i>种植、收获、建塔，让金币与星辉滚起来</li>
-            <li><i>02</i>漏怪会践踏农田：经济断了，防线也会断</li>
-            <li><i>03</i>拖拽旋转视角，滚轮或双指缩放</li>
+            <li><i>01</i>第一人称走进田野：开垦荒地、播种收获、亲手筑塔</li>
+            <li><i>02</i>一块地只能选一种用途：农田、塔基，还是留作荒地</li>
+            <li><i>03</i><b>WASD</b> 移动 · 鼠标看 · <b>E</b> 近处交互 · <b>V</b> 俯瞰布局</li>
           </ul>
           <div class="menu-meta">
             <span id="menu-best">最佳纪录：—</span>
             <span class="dot">·</span>
-            <span>6 波 · 约 10 分钟</span>
+            <span>24 块可开垦地 · 6 波 · 约 12 分钟</span>
           </div>
           <div class="menu-credit">CC0 / 可商用素材 · Three.js · 本地运行</div>
         </div>
@@ -178,21 +197,22 @@
           <h2>值守手册</h2>
           <p class="modal-lead">
             你是一座浮空山田的最后守望者。野兽会沿石径攻向<strong>守望之种</strong>；每一次漏怪都会摧毁一块作物。种田是经济，塔是保险。
+            荒地、开垦好的农田与塔基是地块的三种状态——一块地只能选一种用途。
           </p>
           <div class="help-grid">
             <section>
               <h3>核心循环</h3>
               <ol class="help-list">
-                <li><b>播种</b>：选择作物后点击田地，拖动可连续播种。</li>
-                <li><b>收获</b>：作物成熟后点击收获，或按 <kbd>H</kbd> 一键收。</li>
-                <li><b>筑塔</b>：选择防御塔，点击石台建造；点击已有塔可升级。</li>
-                <li><b>备战</b>：准备时间结束自动开战，也可提前迎战领金币。</li>
+                <li><b>走动</b>：<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动，鼠标看向田野，<kbd>E</kbd> 与眼前的地块交互。</li>
+                <li><b>开垦</b>：走到荒地旁按 <kbd>E</kbd>，花金币开垦成农田；一块比一块贵。</li>
+                <li><b>播种 / 收获</b>：选择作物后走到农田旁按 <kbd>E</kbd> 播种；成熟后再按 <kbd>E</kbd> 收获。</li>
+                <li><b>筑塔</b>：选择防御塔，走到荒地或空农田旁按 <kbd>E</kbd> 建塔；地块变成塔基，不能再种作物。</li>
               </ol>
             </section>
             <section>
               <h3>资源与取舍</h3>
               <ul class="help-list">
-                <li><span class="swatch gold"></span><b>金币</b>：播种、建塔、开垦焦土。</li>
+                <li><span class="swatch gold"></span><b>金币</b>：开垦、播种、建塔、修复焦土。</li>
                 <li><span class="swatch star"></span><b>星辉</b>：星辉花产出，建造/升级星辉圣坛与塔升级需要。</li>
                 <li><span class="swatch life"></span><b>生命</b>：漏怪扣生命并烧毁作物，降至 0 即失败。</li>
               </ul>
@@ -200,18 +220,18 @@
             <section>
               <h3>操作</h3>
               <ul class="help-list controls">
-                <li><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 选择作物</li>
-                <li><kbd>4</kbd><kbd>5</kbd><kbd>6</kbd> 选择防御塔</li>
-                <li><kbd>Space</kbd> 提前迎战 · <kbd>H</kbd> 收获全部</li>
-                <li><kbd>T</kbd> 双倍速 · <kbd>P</kbd>/<kbd>Esc</kbd> 暂停 · <kbd>M</kbd> 静音</li>
+                <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动 · 鼠标视角 · <kbd>Space</kbd> 跳跃</li>
+                <li><kbd>E</kbd> 交互 · <kbd>V</kbd> 第一人称 / 俯瞰</li>
+                <li><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 选择作物 · <kbd>4</kbd><kbd>5</kbd><kbd>6</kbd> 选择防御塔</li>
+                <li><kbd>Enter</kbd> 提前迎战 · <kbd>T</kbd> 双倍速 · <kbd>P</kbd>/<kbd>Esc</kbd> 暂停 · <kbd>M</kbd> 静音</li>
               </ul>
             </section>
             <section>
               <h3>野战提示</h3>
               <ul class="help-list">
-                <li>先把 3–4 块麦田种满，再起第一座箭塔。</li>
-                <li>南瓜炮台的范围伤害是密集狐群的天敌。</li>
-                <li>星辉花成熟较慢，但高阶塔与升级都离不开它。</li>
+                <li>先把靠近营地的 3–4 块地开垦种麦，再起第一座箭塔。</li>
+                <li>南、北、西三面的外圈地块靠近石径，适合建塔；内圈地块更适合安心种田。</li>
+                <li>塔建在农田上会把农田变成塔基；拆除后农田会恢复，但开垦费不会退还。</li>
                 <li>焦土可以花 {{repairCost}} 金币修复；新田可逐步开垦。</li>
               </ul>
             </section>
@@ -233,7 +253,7 @@
             <button class="btn-ghost" id="btn-restart" type="button">重新开始</button>
             <button class="btn-ghost" id="btn-quit" type="button">返回标题</button>
           </div>
-          <div class="pause-tip">提示：漏怪不仅扣生命，还会烧毁一块作物。</div>
+          <div class="pause-tip">提示：开垦、播种、收获、建塔都要走到地块近处按 E。</div>
         </div>
       </section>
 

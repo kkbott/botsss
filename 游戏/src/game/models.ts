@@ -832,3 +832,86 @@ export function makeLily(size: number): Group {
   g.add(pad);
   return g;
 }
+
+/* ───────────────────────────── player ───────────────────────────── */
+
+export interface FarmerRig {
+  group: Group;
+  legs: [Group, Group];
+  arms: [Group, Group];
+  torso: Group;
+  head: Group;
+}
+
+/**
+ * Low-poly farmer used by the first-person character controller. The model
+ * faces -Z so `rotation.y = yaw` matches the camera forward vector.
+ */
+export function makeFarmer(): FarmerRig {
+  const group = new Group();
+  const skin = 0xd9a878;
+  const shirt = 0xe8ddc2;
+  const overalls = 0x466b8c;
+  const boots = 0x5a4632;
+  const straw = 0xd9b45e;
+
+  const legs: [Group, Group] = [new Group(), new Group()];
+  for (let i = 0; i < 2; i++) {
+    const hip = legs[i];
+    hip.position.set(i === 0 ? -0.145 : 0.145, 0.86, 0);
+    hip.add(box(0.2, 0.8, 0.22, overalls, 0, -0.4, 0));
+    hip.add(box(0.22, 0.15, 0.3, boots, 0, -0.79, -0.03));
+    group.add(hip);
+  }
+
+  const torso = new Group();
+  torso.position.y = 0;
+  group.add(torso);
+  torso.add(box(0.5, 0.56, 0.32, overalls, 0, 1.16, 0));
+  torso.add(box(0.54, 0.24, 0.34, shirt, 0, 1.5, 0));
+  torso.add(box(0.12, 0.36, 0.02, shirt, -0.16, 1.34, -0.17));
+  torso.add(box(0.12, 0.36, 0.02, shirt, 0.16, 1.34, -0.17));
+  torso.add(box(0.5, 0.08, 0.36, 0x7a5c3c, 0, 0.9, 0));
+
+  const arms: [Group, Group] = [new Group(), new Group()];
+  for (let i = 0; i < 2; i++) {
+    const shoulder = arms[i];
+    shoulder.position.set(i === 0 ? -0.33 : 0.33, 1.46, 0);
+    shoulder.add(box(0.14, 0.34, 0.18, shirt, 0, -0.17, 0));
+    shoulder.add(box(0.12, 0.28, 0.16, skin, 0, -0.46, 0));
+    torso.add(shoulder);
+  }
+
+  const head = new Group();
+  head.position.y = 1.66;
+  torso.add(head);
+  head.add(sphere(0.18, skin, 0, 0, 0, 7));
+  head.add(box(0.28, 0.14, 0.04, 0x5a3f2a, 0, 0.08, 0.14));
+  // Eyes sit on the -Z face, the same direction the character walks.
+  head.add(box(0.045, 0.05, 0.03, 0x2c231c, -0.07, 0.03, -0.17));
+  head.add(box(0.045, 0.05, 0.03, 0x2c231c, 0.07, 0.03, -0.17));
+  head.add(box(0.07, 0.06, 0.05, 0xc98e64, 0, -0.04, -0.18));
+  head.add(cyl(0.38, 0.42, 0.055, straw, 0, 0.19, 0, 9));
+  head.add(cyl(0.19, 0.23, 0.22, straw, 0, 0.3, 0, 9));
+  head.add(cyl(0.205, 0.235, 0.06, 0x6d8b4f, 0, 0.22, 0, 9));
+
+  return { group, legs, arms, torso, head };
+}
+
+/** A first-person farming hoe, held at the lower-right of the view. */
+export function makeHeldHoe(): Group {
+  const g = new Group();
+  g.add(cyl(0.028, 0.034, 0.92, 0x8a6138, 0, 0.46, 0, 5));
+  g.add(cyl(0.036, 0.036, 0.07, 0x5e432b, 0, 0.04, 0, 5));
+  const blade = box(0.26, 0.045, 0.16, 0x9aa3a8, 0, 0.01, -0.08);
+  blade.rotation.x = 0.24;
+  g.add(blade);
+  // A gloved hand gripping the shaft, so the tool reads as held.
+  g.add(sphere(0.07, 0x8a5a3c, 0.01, 0.5, 0.02, 5));
+  g.add(box(0.1, 0.16, 0.11, 0x8a5a3c, 0, 0.44, 0.02));
+  g.traverse((child) => {
+    child.castShadow = false;
+    child.receiveShadow = false;
+  });
+  return g;
+}
