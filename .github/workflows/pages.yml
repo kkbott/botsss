@@ -29,14 +29,24 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: 游戏/package-lock.json
+          cache-dependency-path: |
+            游戏/package-lock.json
+            游戏经典版/package-lock.json
 
-      - name: Install game dependencies
+      - name: Install first-person game dependencies
         working-directory: 游戏
         run: npm ci --no-audit --no-fund
 
-      - name: Type-check and build the game
+      - name: Type-check and build the first-person game
         working-directory: 游戏
+        run: npm run build
+
+      - name: Install classic game dependencies
+        working-directory: 游戏经典版
+        run: npm ci --no-audit --no-fund
+
+      - name: Type-check and build the classic game
+        working-directory: 游戏经典版
         run: npm run build
 
       - name: Assemble the Pages site

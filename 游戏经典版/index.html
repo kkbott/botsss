@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#1d3427" />
+    <meta
+      name="description"
+      content="穗守 · Harvest & Hold — 用 Three.js 制作的单机种田 × 塔防 3D 网页小游戏。种田养塔，守住农田，抵御六波野兽。"
+    />
+    <title>穗守 · Harvest &amp; Hold</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="scene-shell">
+        <canvas id="scene" aria-label="穗守 3D 游戏场景"></canvas>
+        <div class="vignette" aria-hidden="true"></div>
+        <div id="float-layer" aria-hidden="true"></div>
+        <div id="enemy-bar-layer" aria-hidden="true"></div>
+      </div>
+
+      <header id="hud" hidden>
+        <div class="hud-left">
+          <div class="brand">
+            <span class="brand-mark">🌾</span>
+            <span class="brand-text"><b>穗守</b><small>HARVEST &amp; HOLD</small></span>
+          </div>
+          <div class="resource-chips">
+            <div class="chip chip-gold" title="金币：种植与战斗获得，用于建造和开垦">
+              <span class="chip-icon">🪙</span><b id="stat-gold">90</b>
+            </div>
+            <div class="chip chip-star" title="星辉：星辉花产出，用于高阶塔">
+              <span class="chip-icon">✦</span><b id="stat-star">0</b>
+            </div>
+            <div class="chip chip-life" title="生命：漏怪会损失生命并践踏农田">
+              <span class="chip-icon">♥</span><b id="stat-lives">20</b>
+            </div>
+          </div>
+        </div>
+
+        <div class="wave-panel" id="wave-panel">
+          <div class="wave-row">
+            <span class="wave-kicker" id="wave-kicker">准备</span>
+            <span class="wave-count" id="wave-count">第 1 / 6 波</span>
+            <span class="wave-preview" id="wave-preview" aria-hidden="true"></span>
+          </div>
+          <div class="wave-progress"><i id="wave-progress-fill"></i></div>
+          <div class="wave-row wave-row-bottom">
+            <span class="wave-timer" id="wave-timer">00:25</span>
+            <span class="wave-sub" id="wave-sub">整备农田与防御</span>
+          </div>
+        </div>
+
+        <div class="hud-right">
+          <span id="fps-badge" class="fps-badge" title="渲染帧率">60 FPS</span>
+          <button class="icon-btn" id="btn-speed" type="button" title="切换游戏速度 (T)" aria-label="切换游戏速度">1×</button>
+          <button class="icon-btn" id="btn-sound" type="button" title="音效开关 (M)" aria-label="音效开关">♪</button>
+          <button class="icon-btn" id="btn-help" type="button" title="玩法与操作 (H)" aria-label="玩法与操作">?</button>
+          <button class="icon-btn" id="btn-pause" type="button" title="暂停 (P)" aria-label="暂停">❚❚</button>
+        </div>
+      </header>
+
+      <div id="banner" class="banner" aria-live="polite"></div>
+
+      <div id="bottom-bar" hidden>
+        <div class="bottom-inner">
+          <section class="tool-group" aria-label="作物">
+            <div class="tool-group-title"><span>播种</span><small>SEED</small></div>
+            <div class="tool-row">
+              <button class="tool-card" type="button" data-crop="wheat" aria-pressed="false">
+                <span class="tool-icon">🌾</span>
+                <span class="tool-copy"><b>金穗麦</b><small><i>🪙</i> 6 · 9s</small></span>
+              </button>
+              <button class="tool-card" type="button" data-crop="pumpkin" aria-pressed="false">
+                <span class="tool-icon">🎃</span>
+                <span class="tool-copy"><b>暖阳南瓜</b><small><i>🪙</i> 18 · 22s</small></span>
+              </button>
+              <button class="tool-card" type="button" data-crop="flower" aria-pressed="false">
+                <span class="tool-icon">✨</span>
+                <span class="tool-copy"><b>星辉花</b><small><i>🪙</i> 26 · 30s</small></span>
+              </button>
+            </div>
+          </section>
+
+          <section class="tool-group" aria-label="防御塔">
+            <div class="tool-group-title"><span>筑塔</span><small>GUARD</small></div>
+            <div class="tool-row">
+              <button class="tool-card" type="button" data-tower="arrow" aria-pressed="false">
+                <span class="tool-icon">🏹</span>
+                <span class="tool-copy"><b>风语箭塔</b><small><i>🪙</i> 45</small></span>
+              </button>
+              <button class="tool-card" type="button" data-tower="cannon" aria-pressed="false">
+                <span class="tool-icon">💥</span>
+                <span class="tool-copy"><b>南瓜炮台</b><small><i>🪙</i> 90</small></span>
+              </button>
+              <button class="tool-card" type="button" data-tower="star" aria-pressed="false">
+                <span class="tool-icon">🔮</span>
+                <span class="tool-copy"><b>星辉圣坛</b><small><i>✦</i> 2 · <i>🪙</i> 120</small></span>
+              </button>
+            </div>
+          </section>
+
+          <div class="tool-utility">
+            <button class="utility-btn" type="button" id="btn-harvest-all" title="收获所有成熟作物 (H)">
+              <span>收获全部</span><kbd>H</kbd>
+            </button>
+            <button class="utility-btn utility-next" type="button" id="btn-next-wave" title="提前迎接下一波，获得额外金币">
+              <span id="btn-next-label">提前迎战</span><kbd>Space</kbd>
+            </button>
+          </div>
+        </div>
+        <div class="context-hint" id="context-hint">选择作物后点击农田播种，拖动可连续播种</div>
+      </div>
+
+      <aside id="inspector" class="inspector" hidden aria-live="polite">
+        <button class="inspector-close" id="btn-inspector-close" type="button" aria-label="关闭">×</button>
+        <div class="inspector-head">
+          <span class="inspector-icon" id="inspect-icon">🏹</span>
+          <div>
+            <h2 id="inspect-name">风语箭塔</h2>
+            <p id="inspect-sub">Windwatch · Lv.1</p>
+          </div>
+        </div>
+        <div class="inspect-stats" id="inspect-stats"></div>
+        <p class="inspect-note" id="inspect-note"></p>
+        <div class="inspect-actions">
+          <button class="btn-primary btn-small" id="btn-upgrade" type="button">升级</button>
+          <button class="btn-ghost btn-small" id="btn-sell" type="button">拆除</button>
+        </div>
+      </aside>
+
+      <div id="tooltip" class="tooltip" hidden></div>
+      <div id="toast-layer" class="toast-layer" aria-live="assertive"></div>
+      <div id="screen-flash" class="screen-flash" aria-hidden="true"></div>
+
+      <section id="loading-screen" class="screen loading-screen">
+        <div class="loading-card">
+          <div class="loading-emblem">🌾</div>
+          <h1>穗守</h1>
+          <p>正在开垦山野、唤醒守望者…</p>
+          <div class="loading-track"><i id="loading-fill"></i></div>
+          <span class="loading-note" id="loading-note">载入低多边形世界</span>
+          <span class="loading-tip">提示：星辉花是解锁高阶防御的钥匙。</span>
+        </div>
+      </section>
+
+      <section id="menu-screen" class="screen menu-screen" hidden>
+        <div class="menu-scrim"></div>
+        <div class="menu-content">
+          <div class="eyebrow"><span></span>低多边形 · 单机 · 无需登录<span></span></div>
+          <h1 class="game-title">穗守</h1>
+          <div class="game-title-en">HARVEST &amp; HOLD</div>
+          <p class="tagline">种下希望，筑起守望。<br />守住农田，也守住最后一口粮。</p>
+          <div class="menu-actions">
+            <button class="btn-primary btn-hero" id="btn-start" type="button">开始守望</button>
+            <button class="btn-ghost" id="btn-howto" type="button">玩法与操作</button>
+          </div>
+          <ul class="menu-points">
+            <li><i>01</i>种植、收获、建塔，让金币与星辉滚起来</li>
+            <li><i>02</i>漏怪会践踏农田：经济断了，防线也会断</li>
+            <li><i>03</i>拖拽旋转视角，滚轮或双指缩放</li>
+          </ul>
+          <div class="menu-meta">
+            <span id="menu-best">最佳纪录：—</span>
+            <span class="dot">·</span>
+            <span>6 波 · 约 10 分钟</span>
+          </div>
+          <div class="menu-credit">CC0 / 可商用素材 · Three.js · 本地运行</div>
+        </div>
+        <div class="menu-side-note">FARM · FEED · DEFEND</div>
+      </section>
+
+      <section id="help-screen" class="overlay" hidden>
+        <div class="modal modal-help">
+          <button class="modal-close" data-close="help" type="button" aria-label="关闭">×</button>
+          <div class="modal-kicker">FIELD NOTES</div>
+          <h2>值守手册</h2>
+          <p class="modal-lead">
+            你是一座浮空山田的最后守望者。野兽会沿石径攻向<strong>守望之种</strong>；每一次漏怪都会摧毁一块作物。种田是经济，塔是保险。
+          </p>
+          <div class="help-grid">
+            <section>
+              <h3>核心循环</h3>
+              <ol class="help-list">
+                <li><b>播种</b>：选择作物后点击田地，拖动可连续播种。</li>
+                <li><b>收获</b>：作物成熟后点击收获，或按 <kbd>H</kbd> 一键收。</li>
+                <li><b>筑塔</b>：选择防御塔，点击石台建造；点击已有塔可升级。</li>
+                <li><b>备战</b>：准备时间结束自动开战，也可提前迎战领金币。</li>
+              </ol>
+            </section>
+            <section>
+              <h3>资源与取舍</h3>
+              <ul class="help-list">
+                <li><span class="swatch gold"></span><b>金币</b>：播种、建塔、开垦焦土。</li>
+                <li><span class="swatch star"></span><b>星辉</b>：星辉花产出，建造/升级星辉圣坛与塔升级需要。</li>
+                <li><span class="swatch life"></span><b>生命</b>：漏怪扣生命并烧毁作物，降至 0 即失败。</li>
+              </ul>
+            </section>
+            <section>
+              <h3>操作</h3>
+              <ul class="help-list controls">
+                <li><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 选择作物</li>
+                <li><kbd>4</kbd><kbd>5</kbd><kbd>6</kbd> 选择防御塔</li>
+                <li><kbd>Space</kbd> 提前迎战 · <kbd>H</kbd> 收获全部</li>
+                <li><kbd>T</kbd> 双倍速 · <kbd>P</kbd>/<kbd>Esc</kbd> 暂停 · <kbd>M</kbd> 静音</li>
+              </ul>
+            </section>
+            <section>
+              <h3>野战提示</h3>
+              <ul class="help-list">
+                <li>先把 3–4 块麦田种满，再起第一座箭塔。</li>
+                <li>南瓜炮台的范围伤害是密集狐群的天敌。</li>
+                <li>星辉花成熟较慢，但高阶塔与升级都离不开它。</li>
+                <li>焦土可以花 {{repairCost}} 金币修复；新田可逐步开垦。</li>
+              </ul>
+            </section>
+          </div>
+          <div class="modal-foot">
+            <span>所有外部美术资源均为 CC0 或明确允许商用与再分发，详见仓库 CREDITS.md。</span>
+            <button class="btn-primary btn-small" data-close="help" type="button">继续守望</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="pause-screen" class="overlay" hidden>
+        <div class="modal modal-pause">
+          <div class="modal-kicker">PAUSED</div>
+          <h2>风吹过田野</h2>
+          <p class="modal-lead">时间暂时停下。调整呼吸，再决定下一铲土落在哪里。</p>
+          <div class="pause-actions">
+            <button class="btn-primary" id="btn-resume" type="button">继续守望</button>
+            <button class="btn-ghost" id="btn-restart" type="button">重新开始</button>
+            <button class="btn-ghost" id="btn-quit" type="button">返回标题</button>
+          </div>
+          <div class="pause-tip">提示：漏怪不仅扣生命，还会烧毁一块作物。</div>
+        </div>
+      </section>
+
+      <section id="end-screen" class="overlay end-screen" hidden>
+        <div class="modal modal-end">
+          <div class="end-glyph" id="end-glyph">🌾</div>
+          <div class="modal-kicker" id="end-kicker">THE FIELD HOLDS</div>
+          <h2 id="end-title">守望成功</h2>
+          <p class="modal-lead" id="end-lead"></p>
+          <div class="end-stats" id="end-stats"></div>
+          <div class="end-actions">
+            <button class="btn-primary" id="btn-again" type="button">再来一季</button>
+            <button class="btn-ghost" id="btn-back-menu" type="button">返回标题</button>
+          </div>
+          <div class="end-record" id="end-record"></div>
+        </div>
+      </section>
+
+      <div id="rotate-hint" class="rotate-hint" hidden>
+        <span>↻</span> 横屏或更宽的窗口体验更佳
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 /**
- * 把「网站/」和「游戏/dist/」组装成可直接发布的 _site/：
+ * 把「网站/」和两个游戏构建组装成可直接发布的 _site/：
  *
- *   _site/index.html       ← 网站/ 的内容（个人站，位于 Pages 根路径）
- *   _site/game/index.html  ← 游戏构建（位于 /game/ 子路径）
+ *   _site/index.html         ← 网站/ 的内容（个人站，位于 Pages 根路径）
+ *   _site/game/index.html    ← 第一人称版《穗守》（位于 /game/ 子路径）
+ *   _site/classic/index.html ← 经典版《穗守》（位于 /classic/ 子路径）
  *
- * 用法（先构建游戏）：
+ * 用法（先构建两个游戏）：
  *   cd 游戏 && npm run build && cd ..
+ *   cd 游戏经典版 && npm run build && cd ..
  *   node .github/scripts/build-pages.mjs
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -15,8 +17,22 @@ import vm from 'node:vm';
 
 const root = resolve(process.cwd());
 const siteDir = join(root, '网站');
-const gameDist = join(root, '游戏', 'dist');
 const outDir = join(root, '_site');
+
+const games = [
+  {
+    label: '第一人称版',
+    dir: '游戏',
+    dist: join(root, '游戏', 'dist'),
+    output: 'game',
+  },
+  {
+    label: '经典版',
+    dir: '游戏经典版',
+    dist: join(root, '游戏经典版', 'dist'),
+    output: 'classic',
+  },
+];
 
 const fail = (message) => {
   console.error(`\n✗ ${message}\n`);
@@ -31,11 +47,13 @@ const required = [
   [join(siteDir, 'content.js'), '网站/content.js 不存在'],
   [join(siteDir, 'app.js'), '网站/app.js 不存在'],
   [join(siteDir, 'styles.css'), '网站/styles.css 不存在'],
-  [gameDist, '游戏/dist/ 不存在，请先在 游戏/ 里运行 npm run build'],
-  [join(gameDist, 'index.html'), '游戏构建缺少 index.html'],
 ];
 for (const [path, message] of required) {
   if (!existsSync(path)) fail(message);
+}
+for (const game of games) {
+  if (!existsSync(game.dist)) fail(`${game.dir}/dist/ 不存在，请先在 ${game.dir}/ 里运行 npm run build`);
+  if (!existsSync(join(game.dist, 'index.html'))) fail(`${game.dir}/ 构建缺少 index.html`);
 }
 
 // ── 校验并读取网站内容 ────────────────────────────────────
@@ -82,8 +100,10 @@ for (const entry of readdirSync(siteDir, { withFileTypes: true })) {
   cpSync(join(siteDir, entry.name), join(outDir, entry.name), { recursive: true });
 }
 
-mkdirSync(join(outDir, 'game'), { recursive: true });
-cpSync(gameDist, join(outDir, 'game'), { recursive: true });
+for (const game of games) {
+  mkdirSync(join(outDir, game.output), { recursive: true });
+  cpSync(game.dist, join(outDir, game.output), { recursive: true });
+}
 
 // ── 把 content.js 里的姓名与简介注入静态 HTML 的 meta ─────
 // 这样不执行 JavaScript 的爬虫 / 分享预览也能读到真实文案。
@@ -113,11 +133,11 @@ cpSync(gameDist, join(outDir, 'game'), { recursive: true });
 // ── 发布前的静态检查 ──────────────────────────────────────
 for (const path of [
   join(outDir, 'index.html'),
-  join(outDir, 'game', 'index.html'),
   join(outDir, 'content.js'),
   join(outDir, 'app.js'),
   join(outDir, 'styles.css'),
   join(outDir, 'assets', 'favicon.svg'),
+  ...games.map((game) => join(outDir, game.output, 'index.html')),
 ]) {
   if (!existsSync(path)) problems.push(`缺少 ${relative(outDir, path)}`);
 }
@@ -129,8 +149,34 @@ const localRefs = [...siteHtml.matchAll(/\b(?:src|href)="([^"]+)"/g)]
 
 for (const href of localRefs) {
   const clean = href.split(/[?#]/)[0];
-  if (!clean || clean.endsWith('/')) continue; // 例如 game/，另外检查
+  if (!clean) continue;
+  if (clean.endsWith('/')) {
+    if (!existsSync(join(outDir, clean, 'index.html'))) problems.push(`index.html 引用的 ${href} 没有对应的 index.html`);
+    continue;
+  }
   if (!existsSync(join(outDir, clean))) problems.push(`index.html 引用的 ${href} 不存在`);
+}
+
+// content.js 里的作品入口（包括同一作品的多个版本）必须指向真实存在的页面。
+const workHrefs = new Set();
+if (siteContent && Array.isArray(siteContent.works)) {
+  for (const work of siteContent.works) {
+    if (!work || typeof work !== 'object') continue;
+    const versions = Array.isArray(work.versions) ? work.versions : [];
+    for (const href of [work.href, ...versions.map((version) => version?.href)]) {
+      if (typeof href === 'string' && href.trim()) workHrefs.add(href.trim());
+    }
+  }
+}
+for (const href of workHrefs) {
+  if (/^(?:[a-z]+:|#|\/\/)/i.test(href)) continue;
+  const clean = href.split(/[?#]/)[0];
+  if (!clean) continue;
+  if (clean.endsWith('/')) {
+    if (!existsSync(join(outDir, clean, 'index.html'))) problems.push(`content.js 引用的 ${href} 没有对应的 index.html`);
+  } else if (!existsSync(join(outDir, clean))) {
+    problems.push(`content.js 引用的 ${href} 不存在`);
+  }
 }
 
 const assetRefs = [...contentSource.matchAll(/["'](assets\/[^"']+)["']/g)].map((match) => match[1]);
@@ -138,9 +184,11 @@ for (const asset of new Set(assetRefs)) {
   if (!existsSync(join(outDir, asset))) problems.push(`content.js 引用的 ${asset} 不存在`);
 }
 
-const gameHtml = readFileSync(join(outDir, 'game', 'index.html'), 'utf8');
-if (!/<script[^>]+src="\.?\/?assets\//.test(gameHtml)) {
-  problems.push('游戏 index.html 没有引用相对路径的构建资源');
+for (const game of games) {
+  const gameHtml = readFileSync(join(outDir, game.output, 'index.html'), 'utf8');
+  if (!/<script[^>]+src="\.?\/?assets\//.test(gameHtml)) {
+    problems.push(`${game.output}/index.html 没有引用相对路径的构建资源`);
+  }
 }
 
 if (problems.length) fail(`发布前检查失败：\n  - ${problems.join('\n  - ')}`);
@@ -151,7 +199,7 @@ const bytes = files.reduce((total, entry) => total + statSync(join(entry.parentP
 
 console.log(`✓ 页面已组装到 _site/（${files.length} 个文件，${(bytes / 1024 / 1024).toFixed(2)} MB）`);
 console.log('  站点：/');
-console.log('  游戏：/game/');
+for (const game of games) console.log(`  游戏（${game.label}）：/${game.output}/`);
 
 const placeholders = [];
 if (String(siteContent.name || '').includes('你的名字')) placeholders.push('姓名');

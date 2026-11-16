@@ -4,10 +4,10 @@
 你以第一人称走进浮空山田，把荒地逐块开垦成农田，播种、收获、把塔建在你自己挑的地块上；
 野兽沿石径攻向守望之种，每一次漏怪都会扣生命并烧毁一块作物。守住六波，山野就能迎来下一季。
 
-本目录是仓库里的游戏子项目。线上游戏地址：<https://kkbott.github.io/botsss/game/>，由仓库根目录的 GitHub Actions 随个人网站一起发布；仓库导航见[根目录 README](../README.md)。
+本目录是仓库里的游戏子项目，也是默认的第一人称版。线上游戏地址：<https://kkbott.github.io/botsss/game/>，由仓库根目录的 GitHub Actions 随个人网站一起发布；改造前保留的经典版在 [`游戏经典版/`](../游戏经典版/)，部署在 `/classic/`。仓库导航见[根目录 README](../README.md)。
 
 - 单机、无需登录、无后端；所有玩法状态保存在内存，最佳波次与设置保存在 `localStorage`。
-- 纯静态构建；线上由站点工作流发布到 `/game/`，也可以单独托管。
+- 纯静态构建；线上由站点工作流发布到 `/game/`，经典版发布到 `/classic/`，也可以单独托管。
 - 低多边形美术来自 **CC0** 的 Quaternius 与 Kenney 素材；程序化生成只作为风格兜底和玩法元素。
 - 桌面目标 60fps，窄屏手机提供虚拟摇杆、触屏视角和交互按钮。
 
@@ -49,7 +49,7 @@ npm run preview    # 本地预览生产构建（4173）
 
 ### 部署
 
-本游戏随个人网站一起发布：仓库根目录的 [GitHub Actions](../.github/workflows/pages.yml) 会在 `游戏/` 里执行 `npm ci && npm run build`，再把 `dist/` 放到站点的 `game/` 子路径。因此不需要单独配置游戏仓库的 Pages。
+本游戏随个人网站一起发布：仓库根目录的 [GitHub Actions](../.github/workflows/pages.yml) 会在 `游戏/` 和 `游戏经典版/` 里分别执行 `npm ci && npm run build`，再把两个 `dist/` 放到站点的 `game/`、`classic/` 子路径。因此不需要单独配置游戏仓库的 Pages。
 
 如果只想单独托管本游戏，执行 `npm run build`，把 `dist/` 发布到任意静态站点即可：
 

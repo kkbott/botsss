@@ -10,6 +10,10 @@
 | `after-root-mobile.jpg` | 本次改动在手机 390 × 844 下访问根路径：个人作品集首页 |
 | `after-full-page-desktop.jpg` | 本次改动的桌面整页（作品、关于、联系） |
 | `after-game-playing.jpg` | 从首页点击「游玩《穗守》」打开 `/game/` 并开始游戏后的画面 |
+| `before-classic-entries-desktop.jpg` | 添加经典版入口前（`8e3129f`）的作品卡：只有一个「开始游玩」入口 |
+| `after-classic-entries-desktop.jpg` | 添加「第一人称版」「经典版」两个入口后的作品卡 |
+| `after-classic-game-playing.jpg` | 从 `/classic/` 打开经典版并开始一局 |
+| `after-first-person-game-playing.jpg` | 从 `/game/` 打开第一人称版并开始一局 |
 | `before-contact-desktop.jpg` | 联系邮箱更新前（占位 `hello@example.com`）的联系区 |
 | `after-contact-desktop.jpg` | 联系邮箱更新为 `kkbbot@163.com` 后的联系区 |
 
