@@ -13,8 +13,23 @@ import {
   SphereGeometry,
   Vector3,
 } from 'three';
-import { CROPS, ENEMIES, PLOTS, RULES, STORAGE_KEY, TOWERS, WAVES, WORLD } from './config';
+import {
+  BLESSINGS,
+  CROPS,
+  ENEMIES,
+  PLOTS,
+  RULES,
+  SHOP_ITEMS,
+  STORAGE_KEY,
+  TOWERS,
+  VERSUS_RULES,
+  VERSUS_WAVES,
+  WAVES,
+  WORLD,
+} from './config';
 import type {
+  BlessingChoice,
+  BlessingId,
   CameraMode,
   CropId,
   CropStage,
@@ -23,7 +38,11 @@ import type {
   GamePhase,
   GameStats,
   PlotRuntime,
+  RivalState,
+  RunMode,
   SaveData,
+  ShopItemId,
+  ShopOffer,
   TowerId,
   TowerRuntime,
   WavePhase,
@@ -72,6 +91,8 @@ interface Beam {
 interface CachedSave {
   bestWave: number;
   victories: number;
+  versusWins: number;
+  versusBestWave: number;
   muted: boolean;
 }
 
@@ -79,15 +100,18 @@ const HERO_Y = 0.02;
 function readSave(): CachedSave {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { bestWave: 0, victories: 0, muted: false };
+    if (!raw) return { bestWave: 0, victories: 0, versusWins: 0, versusBestWave: 0, muted: false };
     const parsed = JSON.parse(raw) as Partial<SaveData>;
     return {
       bestWave: typeof parsed.bestWave === 'number' && parsed.bestWave >= 0 ? parsed.bestWave : 0,
       victories: typeof parsed.victories === 'number' && parsed.victories >= 0 ? parsed.victories : 0,
+      versusWins: typeof parsed.versusWins === 'number' && parsed.versusWins >= 0 ? parsed.versusWins : 0,
+      versusBestWave:
+        typeof parsed.versusBestWave === 'number' && parsed.versusBestWave >= 0 ? parsed.versusBestWave : 0,
       muted: parsed.muted === true,
     };
   } catch {
-    return { bestWave: 0, victories: 0, muted: false };
+    return { bestWave: 0, victories: 0, versusWins: 0, versusBestWave: 0, muted: false };
   }
 }
 
@@ -135,11 +159,13 @@ export class Game {
   private readonly canvas: HTMLCanvasElement;
 
   private phase: GamePhase = 'loading';
+  private runMode: RunMode = 'classic';
   private mode: CameraMode = 'first';
   private speed: number = 1;
   private gold: number = RULES.startingGold;
   private star: number = 0;
   private lives: number = RULES.startingLives;
+  private maxLives: number = RULES.startingLives;
   private wave: number = 0;
   private wavePhase: WavePhase = 'prep';
   private prepRemaining: number = RULES.firstPrep;
@@ -147,8 +173,20 @@ export class Game {
   private waveTime: number = 0;
   private waveResolved: number = 0;
   private waveSpawnTotal: number = 0;
+  private waveHpMul = 1;
+  private waveRewardMul = 1;
   private spawnSchedule: Array<{ enemy: EnemyId; at: number }> = [];
   private spawnIndex = 0;
+  private blessingStacks: Partial<Record<BlessingId, number>> = {};
+  private blessingOffers: BlessingChoice[] = [];
+  private blessingPicks = 0;
+  private shopOffers: ShopOffer[] = [];
+  private shopRerolls = 0;
+  private shopPurchases = 0;
+  private rival: RivalState | null = null;
+  private freeReclaim = false;
+  private halfUpgrade = false;
+  private doubleHarvest = false;
 
   private plots: PlotRuntime[] = [];
   private towers: TowerRuntime[] = [];
@@ -180,6 +218,8 @@ export class Game {
     leaks: 0,
     playSeconds: 0,
     reclaimed: 0,
+    merges: 0,
+    blessings: 0,
   };
 
   private save: CachedSave;
@@ -236,7 +276,7 @@ export class Game {
     this.world.updateAmbient(0);
     this.world.render();
     this.phase = 'menu';
-    this.ui.showMenu(this.save.bestWave, this.save.victories);
+    this.ui.showMenu(this.save.bestWave, this.save.victories, this.save.versusWins, this.save.versusBestWave);
     requestAnimationFrame(() => {
       this.ui.setLoading(1, '准备就绪');
       window.setTimeout(() => this.ui.hideLoading(), 180);
@@ -260,9 +300,10 @@ export class Game {
 
   private buildActions(): UIActions {
     return {
-      start: () => this.startGame(),
+      start: () => this.startGame('classic'),
+      startVersus: () => this.startGame('versus'),
       resume: () => this.resumeGame(),
-      restart: () => this.startGame(),
+      restart: () => this.startGame(this.runMode),
       quitToMenu: () => this.goToMenu(),
       selectCrop: (id) => this.selectCrop(id),
       selectTower: (id) => this.selectTower(id),
@@ -274,9 +315,14 @@ export class Game {
       toggleSound: () => this.toggleSound(),
       showHelp: () => this.openHelp(),
       upgradeTower: () => this.upgradeSelectedTower(),
+      mergeTower: () => this.mergeSelectedTower(),
       sellTower: () => this.sellSelectedTower(),
       closeInspector: () => this.clearTowerSelection(),
-      retry: () => this.startGame(),
+      chooseBlessing: (id) => this.chooseBlessing(id as BlessingId),
+      buyShopItem: (id) => this.buyShopItem(id as ShopItemId),
+      rerollShop: () => this.rerollShop(),
+      closeShop: () => this.closeShop(),
+      retry: () => this.startGame(this.runMode),
     };
   }
 
@@ -300,22 +346,27 @@ export class Game {
 
   /* ───────────────────────────── lifecycle ───────────────────────────── */
 
-  private startGame() {
+  private startGame(mode: RunMode = 'classic') {
     if (this.phase === 'loading') return;
+    this.runMode = mode;
+    const versus = mode === 'versus';
     this.audio.init();
     this.audio.setMuted(this.save.muted);
     this.clearDynamicWorld();
     this.resetPlots();
-    this.gold = RULES.startingGold;
+    this.gold = versus ? VERSUS_RULES.startingGold : RULES.startingGold;
     this.star = 0;
-    this.lives = RULES.startingLives;
+    this.maxLives = versus ? VERSUS_RULES.startingLives : RULES.startingLives;
+    this.lives = this.maxLives;
     this.wave = 0;
     this.wavePhase = 'prep';
-    this.prepRemaining = RULES.firstPrep;
-    this.prepTotal = RULES.firstPrep;
+    this.prepRemaining = versus ? VERSUS_RULES.firstPrep : RULES.firstPrep;
+    this.prepTotal = this.prepRemaining;
     this.waveTime = 0;
     this.waveResolved = 0;
     this.waveSpawnTotal = 0;
+    this.waveHpMul = 1;
+    this.waveRewardMul = 1;
     this.spawnSchedule = [];
     this.spawnIndex = 0;
     this.selectedTool = null;
@@ -325,6 +376,16 @@ export class Game {
     this.accumulator = 0;
     this.runTime = 0;
     this.helpPausedRun = false;
+    this.blessingStacks = {};
+    this.blessingOffers = [];
+    this.blessingPicks = 0;
+    this.shopOffers = [];
+    this.shopRerolls = 0;
+    this.shopPurchases = 0;
+    this.rival = versus ? this.makeRival() : null;
+    this.freeReclaim = false;
+    this.halfUpgrade = false;
+    this.doubleHarvest = false;
     this.stats = {
       kills: 0,
       harvestedGold: 0,
@@ -334,8 +395,11 @@ export class Game {
       leaks: 0,
       playSeconds: 0,
       reclaimed: 0,
+      merges: 0,
+      blessings: 0,
     };
     this.ui.hideMenu();
+    this.ui.hideIntermission();
     this.ui.hideEnd();
     this.ui.hidePause();
     this.ui.hideHelp();
@@ -343,6 +407,8 @@ export class Game {
     this.ui.setSelectedTool(null);
     this.ui.hideInspector();
     this.ui.hideTooltip();
+    this.ui.setRival(this.rival, this.lives);
+    this.ui.setBlessings([]);
     this.world.setMenuMode(false);
     this.world.setCameraMode('first');
     this.player.reset();
@@ -351,16 +417,26 @@ export class Game {
     this.mode = 'first';
     this.ui.setCameraMode('first');
     this.ui.setCrosshair(true);
-    this.ui.showBanner(
-      '第 1 波准备',
-      '先把荒地变成麦田',
-      '走到地块旁按 E 开垦，再播种。金币来自收获，塔要建在能照看石径的地块上。',
-      false,
-      4200,
-    );
+    if (versus) {
+      this.ui.showBanner(
+        '对垒 · 第 1 波准备',
+        `${this.rival?.name ?? '对手'}也在守田`,
+        '八波定胜负。第 1–7 波后三选一季令；第 2、4、6 波后行商来访。先失去全部生命者败。',
+        false,
+        4800,
+      );
+    } else {
+      this.ui.showBanner(
+        '第 1 波准备',
+        '先把荒地变成麦田',
+        '走到地块旁按 E 开垦，再播种。金币来自收获，塔要建在能照看石径的地块上。',
+        false,
+        4200,
+      );
+    }
     this.previewRange.visible = false;
     this.phase = 'playing';
-    this.ui.setResources(this.gold, this.star, this.lives, RULES.startingLives, 0, this.plots.length);
+    this.ui.setResources(this.gold, this.star, this.lives, this.maxLives, 0, this.plots.length);
     this.updateHudNow();
     this.updateInteractionPrompt();
     this.audio.play('click');
@@ -425,11 +501,14 @@ export class Game {
     this.ui.hideEnd();
     this.ui.hidePause();
     this.ui.hideHelp();
+    this.ui.hideIntermission();
+    this.ui.setRival(null);
+    this.ui.setBlessings([]);
     this.ui.hideGameHud();
     this.ui.setInteractPrompt(null);
     this.ui.setTouchControlsVisible(false);
     this.ui.setCrosshair(false);
-    this.ui.showMenu(this.save.bestWave, this.save.victories);
+    this.ui.showMenu(this.save.bestWave, this.save.victories, this.save.versusWins, this.save.versusBestWave);
     this.world.setMenuMode(true);
     this.world.setCameraMode('orbit');
     this.world.resetCamera(true);
@@ -440,7 +519,7 @@ export class Game {
     this.phase = 'menu';
   }
 
-  private endGame(victory: boolean) {
+  private endGame(victory: boolean, reason: 'cleared' | 'lives' | 'rival' | 'compare' = 'cleared') {
     if (this.phase === 'victory' || this.phase === 'defeat') return;
     this.phase = victory ? 'victory' : 'defeat';
     this.player.setEnabled(false);
@@ -451,24 +530,47 @@ export class Game {
     this.ui.setInteractPrompt(null);
     this.ui.setTouchControlsVisible(false);
     this.ui.setCrosshair(false);
+    this.ui.hideIntermission();
     this.previewRange.visible = false;
     this.clearHighlights();
     this.ui.hideTooltip();
     this.ui.hideInspector();
     this.clearTargetPlot();
-    const reachedWave = victory ? RULES.totalWaves : Math.max(1, this.wave);
-    this.save.bestWave = Math.max(this.save.bestWave, reachedWave);
-    if (victory) this.save.victories += 1;
+    const versus = this.runMode === 'versus';
+    const total = this.totalWaves();
+    const reachedWave =
+      reason === 'rival' || reason === 'lives' || reason === 'compare'
+        ? Math.max(1, this.wave)
+        : victory
+          ? total
+          : Math.max(1, this.wave);
+    if (versus) {
+      this.save.versusBestWave = Math.max(this.save.versusBestWave, reachedWave);
+      if (victory) this.save.versusWins += 1;
+    } else {
+      this.save.bestWave = Math.max(this.save.bestWave, reachedWave);
+      if (victory) this.save.victories += 1;
+    }
     writeSave(this.save);
     this.ui.showEnd({
       victory,
+      mode: this.runMode,
+      reason,
       wave: reachedWave,
-      total: RULES.totalWaves,
+      total,
       kills: this.stats.kills,
       harvestedGold: Math.round(this.stats.harvestedGold),
       towersBuilt: this.stats.towersBuilt,
       seconds: this.stats.playSeconds,
-      record: `最佳纪录：第 ${this.save.bestWave} 波${this.save.victories > 0 ? ` · ${this.save.victories} 次守成` : ''}`,
+      record: versus
+        ? `对垒纪录：第 ${this.save.versusBestWave} 波 · ${this.save.versusWins} 胜`
+        : `最佳纪录：第 ${this.save.bestWave} 波${this.save.victories > 0 ? ` · ${this.save.victories} 次守成` : ''}`,
+      lives: this.lives,
+      maxLives: this.maxLives,
+      blessings: this.stats.blessings,
+      merges: this.stats.merges,
+      rivalName: this.rival?.name,
+      rivalLives: this.rival?.lives ?? 0,
     });
     this.player.setMode('overview');
     this.player.setAvatarVisible(true);
@@ -478,7 +580,12 @@ export class Game {
     this.ui.setCameraMode('overview');
     this.audio.play(victory ? 'victory' : 'defeat');
     if (victory) {
-      this.ui.showBanner('守成', '山野重归宁静', `你坚守了 ${timeText(this.stats.playSeconds)}，守住了所有农田。`, false, 4800);
+      const title = versus ? (reason === 'rival' ? '对手先失守' : '对垒胜利') : '山野重归宁静';
+      const sub =
+        reason === 'rival'
+          ? `${this.rival?.name ?? '对手'}的田先失守了。你守到第 ${Math.max(1, this.wave)} 波。`
+          : `你坚守了 ${timeText(this.stats.playSeconds)}，守住了所有农田。`;
+      this.ui.showBanner(versus ? '对垒' : '守成', title, sub, false, 4800);
       for (let i = 0; i < 5; i++) {
         this.particles.spawn(
           new Vector3(WORLD.core.x + (Math.random() - 0.5) * 6, 1 + Math.random() * 4, WORLD.core.z + (Math.random() - 0.5) * 6),
@@ -487,7 +594,409 @@ export class Game {
           { speed: 3.4, life: 2.4, size: 0.15, gravity: 1.1, up: 3.8 },
         );
       }
+    } else if (versus) {
+      this.ui.showBanner('对垒', '田野先失守了', `${this.rival?.name ?? '对手'}还守着 ${this.rival?.lives ?? 0} 命。下季再战。`, true, 4200);
     }
+  }
+
+  /* ───────────────────────────── season helpers ───────────────────────────── */
+
+  private wavesForRun(): WaveDef[] {
+    return this.runMode === 'versus' ? VERSUS_WAVES : WAVES;
+  }
+
+  private totalWaves() {
+    return this.wavesForRun().length;
+  }
+
+  private prepDuration() {
+    return this.runMode === 'versus' ? VERSUS_RULES.prepBetweenWaves : RULES.prepBetweenWaves;
+  }
+
+  private makeRival(): RivalState {
+    const seed = Math.floor(Math.random() * 100000);
+    const name = VERSUS_RULES.rivalNames[seed % VERSUS_RULES.rivalNames.length];
+    const title = VERSUS_RULES.rivalTitles[(seed >> 3) % VERSUS_RULES.rivalTitles.length];
+    const skill = 0.9 + ((seed >> 5) % 5) * 0.05;
+    const mistakeWave = seed % 2 === 0 ? 1 + ((seed >> 2) % 8) : null;
+    return {
+      name,
+      title,
+      lives: VERSUS_RULES.rivalStartLives,
+      maxLives: VERSUS_RULES.rivalStartLives,
+      wave: 0,
+      harvest: 0,
+      skill,
+      mistakeWave,
+      alive: true,
+    };
+  }
+
+  private stack(id: BlessingId) {
+    return this.blessingStacks[id] ?? 0;
+  }
+
+  private harvestMul() {
+    return 1 + 0.15 * this.stack('harvest');
+  }
+
+  private towerCooldownMul() {
+    return Math.max(0.65, 1 - 0.07 * this.stack('gale'));
+  }
+
+  private towerRangeMul() {
+    return 1 + 0.08 * this.stack('hawk');
+  }
+
+  private reclaimMul() {
+    return Math.max(0.7, 1 - 0.1 * this.stack('soil'));
+  }
+
+  private cropGrowMul() {
+    return Math.max(0.76, 1 - 0.08 * this.stack('rain'));
+  }
+
+  private upgradeGoldMul() {
+    return Math.max(0.7, 1 - 0.15 * this.stack('workshop'));
+  }
+
+  private shopPriceMul() {
+    return Math.max(0.7, 1 - 0.15 * this.stack('bargain'));
+  }
+
+  private waveGoldMul() {
+    return 1 + 0.4 * this.stack('spoils');
+  }
+
+  private seedChance() {
+    return 0.2 * this.stack('seed');
+  }
+
+  private blessingEntries() {
+    return (Object.keys(this.blessingStacks) as BlessingId[])
+      .filter((id) => this.stack(id) > 0)
+      .map((id) => ({ icon: BLESSINGS[id].icon, name: BLESSINGS[id].name, stacks: this.stack(id) }));
+  }
+
+  private refreshBlessingUi() {
+    this.ui.setBlessings(this.blessingEntries());
+    this.refreshTowerBuffs();
+    this.ui.setRival(this.rival, this.lives);
+  }
+
+  private pickBlessings(): BlessingChoice[] {
+    const pool = (Object.keys(BLESSINGS) as BlessingId[]).filter(
+      (id) => this.stack(id) < BLESSINGS[id].maxStacks,
+    );
+    const weights = { common: 60, rare: 30, epic: 10 } as const;
+    const chosen: BlessingChoice[] = [];
+    while (chosen.length < 3 && pool.length > 0) {
+      const total = pool.reduce((sum, id) => sum + weights[BLESSINGS[id].rarity], 0);
+      let roll = Math.random() * total;
+      let picked = pool[pool.length - 1];
+      for (const id of pool) {
+        roll -= weights[BLESSINGS[id].rarity];
+        if (roll <= 0) {
+          picked = id;
+          break;
+        }
+      }
+      pool.splice(pool.indexOf(picked), 1);
+      chosen.push({ def: BLESSINGS[picked], stacks: this.stack(picked) });
+    }
+    return chosen;
+  }
+
+  private openBlessing() {
+    this.blessingOffers = this.pickBlessings();
+    if (this.blessingOffers.length === 0) {
+      this.resumeFromIntermission();
+      return;
+    }
+    this.phase = 'blessing';
+    this.player.setEnabled(false);
+    this.player.releasePointer();
+    this.selectedTool = null;
+    this.ui.setSelectedTool(null);
+    this.ui.setInteractPrompt(null);
+    this.ui.setTouchControlsVisible(false);
+    this.ui.setCrosshair(false);
+    this.previewRange.visible = false;
+    this.clearHighlights();
+    this.ui.hideTooltip();
+    this.ui.hideInspector();
+    this.clearTowerSelection();
+    this.ui.showBlessings(this.blessingOffers, this.wave, this.totalWaves(), this.blessingPicks + 1);
+    this.audio.play('star');
+  }
+
+  private chooseBlessing(id: BlessingId) {
+    if (this.phase !== 'blessing') return;
+    const choice = this.blessingOffers.find((entry) => entry.def.id === id);
+    if (!choice) return;
+    this.blessingStacks[id] = this.stack(id) + 1;
+    if (id === 'bulwark') {
+      this.maxLives += 2;
+      this.lives = Math.min(this.maxLives, this.lives + 2);
+    }
+    this.stats.blessings += 1;
+    this.blessingPicks += 1;
+    this.blessingOffers = [];
+    this.ui.hideBlessings();
+    this.ui.toast(`季令：${choice.def.name} ×${this.stack(id)}`, 'star');
+    this.refreshBlessingUi();
+    this.updateHudNow();
+    this.afterBlessing();
+  }
+
+  private afterBlessing() {
+    if (VERSUS_RULES.shopWaves.includes(this.wave as (typeof VERSUS_RULES.shopWaves)[number])) {
+      this.openShop();
+    } else {
+      this.resumeFromIntermission();
+    }
+  }
+
+  private openShop() {
+    this.shopRerolls = 0;
+    this.shopPurchases = 0;
+    this.shopOffers = this.makeShopOffers();
+    this.phase = 'shop';
+    this.player.setEnabled(false);
+    this.player.releasePointer();
+    this.ui.setInteractPrompt(null);
+    this.ui.setTouchControlsVisible(false);
+    this.ui.setCrosshair(false);
+    this.ui.showShop(this.shopOffers, this.wave, this.shopRerollCost(), this.gold, this.shopPurchases);
+    this.audio.play('click');
+  }
+
+  private shopRerollCost() {
+    return VERSUS_RULES.shopRerollBase + this.shopRerolls * VERSUS_RULES.shopRerollStep;
+  }
+
+  private makeShopOffers(): ShopOffer[] {
+    const pool = Object.keys(SHOP_ITEMS) as ShopItemId[];
+    const count = 3 + this.stack('merchant');
+    const offers: ShopOffer[] = [];
+    while (offers.length < count && pool.length > 0) {
+      const index = Math.floor(Math.random() * pool.length);
+      const id = pool.splice(index, 1)[0];
+      const item = SHOP_ITEMS[id];
+      const price = Math.round(item.basePrice * (1 + 0.06 * this.wave) * this.shopPriceMul());
+      offers.push({ item, price, sold: false });
+    }
+    return offers;
+  }
+
+  private showCurrentShop() {
+    this.ui.showShop(this.shopOffers, this.wave, this.shopRerollCost(), this.gold, this.shopPurchases);
+  }
+
+  private buyShopItem(id: ShopItemId) {
+    if (this.phase !== 'shop') return;
+    if (this.shopPurchases >= 2) {
+      this.nudgeError('行商每次只卖两件：留点金币给下一波');
+      return;
+    }
+    const offer = this.shopOffers.find((entry) => entry.item.id === id);
+    if (!offer || offer.sold) return;
+    if (this.gold < offer.price) {
+      this.nudgeError(`金币不足：${offer.item.name}需要 ${offer.price} 金币`);
+      return;
+    }
+    this.gold -= offer.price;
+    offer.sold = true;
+    this.shopPurchases += 1;
+    switch (id) {
+      case 'starVial':
+        this.star += 2;
+        break;
+      case 'lifeCharm':
+        this.maxLives += 2;
+        this.lives = Math.min(this.maxLives, this.lives + 2);
+        break;
+      case 'deed':
+        this.freeReclaim = true;
+        break;
+      case 'iron':
+        this.halfUpgrade = true;
+        break;
+      case 'seedPouch':
+        this.doubleHarvest = true;
+        break;
+    }
+    this.ui.toast(`行商：${offer.item.name}（-${offer.price} 金币）`, 'gold');
+    this.audio.play('harvest');
+    this.refreshBlessingUi();
+    this.updateHudNow();
+    this.showCurrentShop();
+  }
+
+  private rerollShop() {
+    if (this.phase !== 'shop') return;
+    const cost = this.shopRerollCost();
+    if (this.gold < cost) {
+      this.nudgeError(`刷新需要 ${cost} 金币`);
+      return;
+    }
+    this.gold -= cost;
+    this.shopRerolls += 1;
+    this.shopOffers = this.makeShopOffers();
+    this.ui.toast(`行商换了批货（-${cost} 金币）`, 'default');
+    this.updateHudNow();
+    this.showCurrentShop();
+  }
+
+  private closeShop() {
+    if (this.phase !== 'shop') return;
+    this.ui.hideShop();
+    this.resumeFromIntermission();
+  }
+
+  private resumeFromIntermission() {
+    this.ui.hideBlessings();
+    this.ui.hideShop();
+    this.phase = 'playing';
+    this.accumulator = 0;
+    this.player.setEnabled(this.mode === 'first');
+    this.ui.setCrosshair(this.mode === 'first');
+    this.ui.setRival(this.rival, this.lives);
+    this.ui.setBlessings(this.blessingEntries());
+    this.updateHudNow();
+    this.updateInteractionPrompt();
+    this.ui.showBanner(
+      `第 ${this.wave + 1} 波准备`,
+      this.wave === 0 ? '先把荒地变成麦田' : '下一波正在集结',
+      this.runMode === 'versus' ? '补种、修塔、开垦；对垒还在继续。' : '走到地块旁按 E 开垦、播种或建塔。',
+      false,
+      2500,
+    );
+  }
+
+  private applyRivalWave() {
+    if (!this.rival || !this.rival.alive) return;
+    const base = VERSUS_RULES.rivalLeaks[this.wave - 1] ?? 2;
+    let leaks = Math.max(0, Math.round(base * this.rival.skill));
+    if (this.rival.mistakeWave === this.wave) leaks += 1;
+    const lead = this.lives - this.rival.lives;
+    // Gentle rubber band: only a far-behind player gets a small break. A rival
+    // that is behind does not magically stabilise. See docs/design-v2.md §PvP.
+    if (lead <= -4) leaks = Math.min(4, leaks + 1);
+    this.rival.lives = Math.max(0, this.rival.lives - leaks);
+    this.rival.wave = this.wave;
+    this.rival.harvest += 40 + this.wave * 20;
+    this.rival.alive = this.rival.lives > 0;
+    this.ui.setRival(this.rival, this.lives);
+    if (leaks > 0) {
+      this.ui.toast(`对垒战报：${this.rival.name}漏掉 ${leaks} 只，剩 ${this.rival.lives} 命`, 'warn');
+    } else {
+      this.ui.toast(`对垒战报：${this.rival.name}守住了这一波`, 'default');
+    }
+    if (!this.rival.alive) {
+      this.ui.toast(`${this.rival.name}的守望之种熄灭了！`, 'gold');
+      this.endGame(true, 'rival');
+    }
+  }
+
+  private finishVersus() {
+    if (!this.rival) {
+      this.endGame(true, 'cleared');
+      return;
+    }
+    if (!this.rival.alive) {
+      this.endGame(true, 'rival');
+      return;
+    }
+    if (this.lives > this.rival.lives) {
+      this.endGame(true, 'compare');
+    } else if (this.lives < this.rival.lives) {
+      this.endGame(false, 'compare');
+    } else {
+      this.endGame(this.stats.harvestedGold >= this.rival.harvest, 'compare');
+    }
+  }
+
+  private refreshTowerBuffs() {
+    for (const tower of this.towers) {
+      tower.rangeRing.scale.setScalar(tower.range * this.towerRangeMul());
+    }
+    if (this.selectedTower) this.showTowerInspector(this.selectedTower);
+  }
+
+  private findMergePartner(tower: TowerRuntime): TowerRuntime | null {
+    if (tower.level >= 3) return null;
+    return (
+      this.towers.find(
+        (other) =>
+          other !== tower &&
+          other.id === tower.id &&
+          other.level === tower.level &&
+          Math.abs(other.plot.col - tower.plot.col) + Math.abs(other.plot.row - tower.plot.row) === 1,
+      ) ?? null
+    );
+  }
+
+  private applyTowerLevel(tower: TowerRuntime, nextLevel: 2 | 3) {
+    const def = TOWERS[tower.id];
+    tower.group.removeFromParent();
+    const art = this.art.tower(tower.id, nextLevel);
+    art.group.position.set(0, 0.2, 0);
+    art.group.rotation.y = 0.35 + ((tower.plot.index * 1.7) % 6.28);
+    this.world.plotVisuals[tower.plot.index].group.add(art.group);
+    tower.group = art.group;
+    tower.level = nextLevel;
+    const stats = def.levels[nextLevel - 1];
+    tower.damage = stats.damage;
+    tower.range = stats.range;
+    tower.splash = stats.splash;
+    tower.slow = stats.slow;
+    tower.slowDuration = stats.slowDuration;
+    tower.fireCooldown = stats.cooldown;
+    tower.cooldown = Math.min(tower.cooldown, stats.cooldown * this.towerCooldownMul());
+    tower.rangeRing.scale.setScalar(tower.range * this.towerRangeMul());
+  }
+
+  private mergeTower(tower: TowerRuntime) {
+    if (this.phase !== 'playing') return false;
+    if (tower.level >= 3) {
+      this.nudgeError('这座塔已经到最高等级，不能再合成');
+      return false;
+    }
+    const partner = this.findMergePartner(tower);
+    if (!partner) {
+      this.nudgeError('合成需要一座相邻的同类型、同等级防御塔');
+      return false;
+    }
+    const plot = this.plots[partner.plot.index];
+    const refund = Math.round(partner.investedGold * (this.stack('confluence') > 0 ? 0.5 : 0));
+    partner.group.removeFromParent();
+    partner.rangeRing.removeFromParent();
+    this.towers = this.towers.filter((entry) => entry !== partner);
+    if (plot) {
+      plot.state = plot.underlying;
+      plot.scorched = false;
+      plot.crop = null;
+      this.syncPlot(plot);
+    }
+    this.gold += refund;
+    tower.investedGold += partner.investedGold;
+    tower.investedStar += partner.investedStar;
+    this.applyTowerLevel(tower, (tower.level + 1) as 2 | 3);
+    this.stats.merges += 1;
+    this.particles.burstBuild(new Vector3(tower.plot.x, 0.8, tower.plot.z));
+    this.audio.play('upgrade');
+    this.ui.toast(
+      `合成成功：${TOWERS[tower.id].name} Lv.${tower.level}${refund > 0 ? ` · 返还 ${refund} 金币` : ''}`,
+      'gold',
+    );
+    this.showTowerInspector(tower);
+    this.updateHudNow();
+    return true;
+  }
+
+  private mergeSelectedTower() {
+    if (this.selectedTower) this.mergeTower(this.selectedTower);
   }
 
   private toggleSpeed() {
@@ -577,8 +1086,10 @@ export class Game {
   }
 
   private reclaimCost() {
+    if (this.freeReclaim) return 0;
     const count = this.reclaimedCount();
-    return Math.min(RULES.reclaimMaxCost, RULES.reclaimBaseCost + count * RULES.reclaimStep);
+    const base = Math.min(RULES.reclaimMaxCost, RULES.reclaimBaseCost + count * RULES.reclaimStep);
+    return Math.max(1, Math.round(base * this.reclaimMul()));
   }
 
   private syncPlot(plot: PlotRuntime) {
@@ -638,15 +1149,21 @@ export class Game {
     const plot = this.plots[index];
     if (!plot?.crop?.mature) return false;
     const def = CROPS[plot.crop.type];
-    this.gold += def.yieldGold;
-    this.star += def.yieldStar;
-    this.stats.harvestedGold += def.yieldGold;
-    this.stats.harvestedStar += def.yieldStar;
+    const forcedDouble = this.doubleHarvest;
+    if (forcedDouble) this.doubleHarvest = false;
+    const doubled = forcedDouble || Math.random() < this.seedChance();
+    const goldGain = Math.round(def.yieldGold * this.harvestMul() * (doubled ? 2 : 1));
+    const starGain =
+      def.yieldStar > 0 ? def.yieldStar + this.stack('starlight') : 0;
+    this.gold += goldGain;
+    this.star += starGain;
+    this.stats.harvestedGold += goldGain;
+    this.stats.harvestedStar += starGain;
     const pos = new Vector3(plot.spec.x, 0.8, plot.spec.z);
-    this.particles.burstHarvest(pos, def.color, def.yieldStar > 0);
-    this.floaters.spawn(`+${def.yieldGold}`, new Vector3(plot.spec.x, 1.3, plot.spec.z), 'gold');
-    if (def.yieldStar > 0) {
-      this.floaters.spawn(`+${def.yieldStar} 星辉`, new Vector3(plot.spec.x + 0.35, 1.8, plot.spec.z), 'star');
+    this.particles.burstHarvest(pos, def.color, starGain > 0);
+    this.floaters.spawn(`+${goldGain}`, new Vector3(plot.spec.x, 1.3, plot.spec.z), 'gold');
+    if (starGain > 0) {
+      this.floaters.spawn(`+${starGain} 星辉`, new Vector3(plot.spec.x + 0.35, 1.8, plot.spec.z), 'star');
       this.audio.play('star');
     } else {
       this.audio.play('harvest');
@@ -655,8 +1172,10 @@ export class Game {
     this.clearCropVisual(this.viewFor(plot.spec.index));
     this.syncPlot(plot);
     this.updateHudNow();
-    if (!silent && def.yieldStar > 0) {
-      this.ui.toast(`收获 ${def.name}：+${def.yieldGold} 金币，+${def.yieldStar} 星辉`, 'star');
+    if (!silent && starGain > 0) {
+      this.ui.toast(`收获 ${def.name}：+${goldGain} 金币，+${starGain} 星辉`, 'star');
+    } else if (!silent && doubled) {
+      this.ui.toast(`双生麦穗：${def.name}收获翻倍（+${goldGain} 金币）`, 'gold');
     }
     return true;
   }
@@ -683,11 +1202,13 @@ export class Game {
       return false;
     }
     const cost = this.reclaimCost();
-    if (this.gold < cost) {
+    const free = this.freeReclaim;
+    if (!free && this.gold < cost) {
       this.nudgeError(`金币不足：开垦这块荒地需要 ${cost} 金币`);
       return false;
     }
-    this.gold -= cost;
+    if (free) this.freeReclaim = false;
+    else this.gold -= cost;
     plot.reclaim = { elapsed: 0, total: RULES.reclaimDuration };
     this.activeReclaim = plot;
     const view = this.viewFor(plot.spec.index);
@@ -695,7 +1216,7 @@ export class Game {
     view.farm.scale.setScalar(0.35);
     view.wild.scale.setScalar(1);
     view.highlight.visible = true;
-    this.floaters.spawn(`-${cost}`, new Vector3(plot.spec.x, 1.0, plot.spec.z), 'warn');
+    if (!free) this.floaters.spawn(`-${cost}`, new Vector3(plot.spec.x, 1.0, plot.spec.z), 'warn');
     this.particles.spawn(new Vector3(plot.spec.x, 0.3, plot.spec.z), 0x9ac46b, 8, {
       speed: 1.6,
       life: 0.6,
@@ -704,7 +1225,7 @@ export class Game {
       up: 1.6,
     });
     this.audio.play('plant');
-    this.ui.toast(`开始开垦（-${cost} 金币），稍等片刻`, 'default');
+    this.ui.toast(free ? '地契生效：这次开垦免费' : `开始开垦（-${cost} 金币），稍等片刻`, free ? 'gold' : 'default');
     this.updateHudNow();
     return true;
   }
@@ -822,7 +1343,7 @@ export class Game {
       if (!plot.crop) continue;
       const def = CROPS[plot.crop.type];
       if (!plot.crop.mature) {
-        plot.crop.elapsed += dt;
+        plot.crop.elapsed += dt / this.cropGrowMul();
         const progress = Math.min(1, plot.crop.elapsed / def.growTime);
         const nextStage: CropStage = progress >= 1 ? 3 : progress < 0.34 ? 0 : progress < 0.67 ? 1 : 2;
         const becameMature = nextStage === 3;
@@ -950,7 +1471,8 @@ export class Game {
     const def = TOWERS[tower.id];
     if (tower.level >= 3) return false;
     const nextLevel = (tower.level + 1) as 2 | 3;
-    const goldCost = def.upgradeGold[tower.level - 1];
+    let goldCost = Math.round(def.upgradeGold[tower.level - 1] * this.upgradeGoldMul());
+    if (this.halfUpgrade) goldCost = Math.ceil(goldCost / 2);
     const starCost = def.upgradeStar[tower.level - 1];
     if (this.gold < goldCost || this.star < starCost) {
       this.nudgeError(`升级 ${def.name} 需要 ${goldCost} 金币${starCost ? ` + ${starCost} 星辉` : ''}`);
@@ -958,25 +1480,11 @@ export class Game {
     }
     this.gold -= goldCost;
     this.star -= starCost;
+    this.halfUpgrade = false;
     this.particles.burstBuild(new Vector3(tower.plot.x, 0.7, tower.plot.z));
-    tower.group.removeFromParent();
-    const art = this.art.tower(tower.id, nextLevel);
-    art.group.position.set(0, 0.2, 0);
-    art.group.rotation.y = 0.35 + ((tower.plot.index * 1.7) % 6.28);
-    this.world.plotVisuals[tower.plot.index].group.add(art.group);
-    tower.group = art.group;
-    tower.level = nextLevel;
-    const stats = def.levels[nextLevel - 1];
-    tower.damage = stats.damage;
-    tower.range = stats.range;
-    tower.splash = stats.splash;
-    tower.slow = stats.slow;
-    tower.slowDuration = stats.slowDuration;
-    tower.fireCooldown = stats.cooldown;
-    tower.cooldown = Math.min(tower.cooldown, stats.cooldown);
     tower.investedGold += goldCost;
     tower.investedStar += starCost;
-    tower.rangeRing.scale.setScalar(tower.range);
+    this.applyTowerLevel(tower, nextLevel);
     this.audio.play('upgrade');
     this.ui.toast(`${def.name} 升至 Lv.${nextLevel}`, 'gold');
     this.showTowerInspector(tower);
@@ -1047,28 +1555,39 @@ export class Game {
     const stats: InspectorData['stats'] = [
       { label: '等级', value: `Lv.${tower.level}` },
       { label: '伤害', value: String(level.damage) },
-      { label: '射程', value: level.range.toFixed(1) },
-      { label: '攻击间隔', value: `${level.cooldown.toFixed(2)}s` },
-      { label: '每秒伤害', value: (level.damage / level.cooldown).toFixed(1) },
+      { label: '射程', value: (level.range * this.towerRangeMul()).toFixed(1) },
+      { label: '攻击间隔', value: `${(level.cooldown * this.towerCooldownMul()).toFixed(2)}s` },
+      { label: '每秒伤害', value: (level.damage / (level.cooldown * this.towerCooldownMul())).toFixed(1) },
     ];
     if (tower.id === 'cannon') stats.push({ label: '爆炸半径', value: level.splash.toFixed(1) });
     if (tower.id === 'star') stats.push({ label: '减速', value: `${Math.round(level.slow * 100)}% / ${level.slowDuration}s` });
     if (tower.id === 'arrow') stats.push({ label: '特性', value: '单体速射' });
     const canUpgrade = tower.level < 3;
-    const nextGold = canUpgrade ? def.upgradeGold[tower.level - 1] : 0;
+    const nextGold = canUpgrade
+      ? Math.ceil(Math.round(def.upgradeGold[tower.level - 1] * this.upgradeGoldMul()) / (this.halfUpgrade ? 2 : 1))
+      : 0;
     const nextStar = canUpgrade ? def.upgradeStar[tower.level - 1] : 0;
     const upgradeEnabled =
       canUpgrade && this.phase === 'playing' && this.gold >= nextGold && this.star >= nextStar;
     const upgradeLabel = canUpgrade
       ? `升级 Lv.${tower.level + 1} · ${nextGold} 金币${nextStar ? ` + ${nextStar} 星辉` : ''}`
       : '已达最高等级';
+    const partner = this.findMergePartner(tower);
+    const mergeLabel =
+      tower.level >= 3
+        ? ''
+        : partner
+          ? `合成 Lv.${tower.level + 1}`
+          : '合成：需相邻同阶塔';
+    const mergeEnabled = !!partner && this.phase === 'playing';
     const refund = Math.round(tower.investedGold * RULES.sellRefund);
+    const mergeHint = partner
+      ? `可与相邻的${TOWERS[partner.id].name}（Lv.${partner.level}）合成：消耗它，本塔免费升到 Lv.${tower.level + 1}。`
+      : '在相邻地块再建一座同类型、同等级的塔，即可免费合成升阶。';
     const note =
       tower.level >= 3
-        ? `这座塔已经抵达最高等级。拆除后这块地会恢复为${tower.plot.index >= 0 && this.plots[tower.plot.index]?.underlying === 'farmland' ? '农田' : '荒地'}。`
-        : upgradeEnabled
-          ? `${def.name}会随等级提高伤害与射程。升级同时消耗金币与星辉。`
-          : `还不够升级：需要 ${nextGold} 金币${nextStar ? ` 和 ${nextStar} 星辉` : ''}。多种星辉花可以补充星辉。`;
+        ? `这座塔已经抵达最高等级。拆除后这块地会恢复为${this.plots[tower.plot.index]?.underlying === 'farmland' ? '农田' : '荒地'}。`
+        : `${mergeHint}${upgradeEnabled ? '' : ` 直接升级需要 ${nextGold} 金币${nextStar ? ` 和 ${nextStar} 星辉` : ''}。`}`;
     this.ui.showInspector({
       icon: def.icon,
       name: def.name,
@@ -1077,6 +1596,8 @@ export class Game {
       note,
       upgradeLabel,
       upgradeEnabled,
+      mergeLabel,
+      mergeEnabled,
       sellLabel: `拆除 +${refund} 金币`,
       sellEnabled: this.phase === 'playing',
     });
@@ -1093,7 +1614,7 @@ export class Game {
 
   private startNextWave(early: boolean) {
     if (this.phase !== 'playing' || this.wavePhase !== 'prep') return;
-    if (this.wave >= RULES.totalWaves) return;
+    if (this.wave >= this.totalWaves()) return;
     if (early) {
       this.gold += RULES.earlyStartBonus;
       this.ui.toast(`提前迎战：+${RULES.earlyStartBonus} 金币`, 'gold');
@@ -1103,7 +1624,9 @@ export class Game {
 
   private spawnWave() {
     this.wave += 1;
-    const def = WAVES[this.wave - 1];
+    const def = this.wavesForRun()[this.wave - 1];
+    this.waveHpMul = def.hpMul ?? 1;
+    this.waveRewardMul = def.rewardMul ?? 1;
     this.wavePhase = 'active';
     this.waveTime = 0;
     this.waveResolved = 0;
@@ -1152,10 +1675,11 @@ export class Game {
     track.appendChild(fill);
     bar.appendChild(track);
     this.enemyBarLayer.appendChild(bar);
+    const hp = Math.round(def.hp * this.waveHpMul);
     const enemy: EnemyRuntime = {
       id,
-      hp: def.hp,
-      maxHp: def.hp,
+      hp,
+      maxHp: hp,
       speed: def.speed,
       progress: 0,
       worldPos: new Vector3(pos.x, HERO_Y, pos.z),
@@ -1243,7 +1767,8 @@ export class Game {
     if (enemy.dead) return;
     enemy.dead = true;
     const def = ENEMIES[enemy.id];
-    this.lives -= def.coreDamage;
+    const damage = Math.max(1, def.coreDamage - (this.stack('thorns') > 0 ? 1 : 0));
+    this.lives -= damage;
     this.stats.leaks += 1;
     this.waveResolved += 1;
     const destroyed = this.trampleCrops(def.boss ? 2 : 1);
@@ -1256,16 +1781,16 @@ export class Game {
       gravity: 4,
       up: 2.6,
     });
-    this.floaters.spawn(`-${def.coreDamage} 生命`, new Vector3(WORLD.core.x, 3, WORLD.core.z), 'warn');
+    this.floaters.spawn(`-${damage} 生命`, new Vector3(WORLD.core.x, 3, WORLD.core.z), 'warn');
     if (destroyed > 0) {
-      this.ui.toast(`${def.name}冲过防线：-${def.coreDamage} 生命，${destroyed} 块农田被烧毁！`, 'warn');
+      this.ui.toast(`${def.name}冲过防线：-${damage} 生命，${destroyed} 块农田被烧毁！`, 'warn');
     } else {
-      this.ui.toast(`${def.name}冲过防线：-${def.coreDamage} 生命`, 'warn');
+      this.ui.toast(`${def.name}冲过防线：-${damage} 生命`, 'warn');
     }
     if (this.lives <= 0) {
       this.lives = 0;
       this.updateHudNow();
-      this.endGame(false);
+      this.endGame(false, 'lives');
     }
   }
 
@@ -1273,14 +1798,15 @@ export class Game {
     if (enemy.dead) return;
     enemy.dead = true;
     const def = ENEMIES[enemy.id];
-    this.gold += def.reward;
+    const reward = Math.round(def.reward * this.waveRewardMul);
+    this.gold += reward;
     this.stats.kills += 1;
     this.waveResolved += 1;
     this.particles.burstDeath(enemy.group.position.clone().add(new Vector3(0, 0.35, 0)), def.tint);
-    this.floaters.spawn(`+${def.reward}`, enemy.group.position.clone().add(new Vector3(0, def.height + 0.2, 0)), 'gold');
+    this.floaters.spawn(`+${reward}`, enemy.group.position.clone().add(new Vector3(0, def.height + 0.2, 0)), 'gold');
     if (def.boss) {
       this.star += RULES.bossStarDrop;
-      this.ui.showBanner('BOSS 击破', '鹿王倒下了', `获得 ${RULES.bossStarDrop} 星辉 · +${def.reward} 金币`, false, 2800);
+      this.ui.showBanner('BOSS 击破', '鹿王倒下了', `获得 ${RULES.bossStarDrop} 星辉 · +${reward} 金币`, false, 2800);
       this.audio.play('star');
     }
     if (Date.now() - this.lastHitSound > 65) {
@@ -1317,7 +1843,8 @@ export class Game {
       if (enemy.dead) continue;
       const dx = enemy.group.position.x - tower.plot.x;
       const dz = enemy.group.position.z - tower.plot.z;
-      if (dx * dx + dz * dz > tower.range * tower.range) continue;
+      const range = tower.range * this.towerRangeMul();
+      if (dx * dx + dz * dz > range * range) continue;
       if (!best || enemy.progress > best.progress) best = enemy;
     }
     return best;
@@ -1408,7 +1935,7 @@ export class Game {
       if (spin) spin.rotation.y += dt * 0.85;
       if (!target) continue;
       if (tower.cooldown <= 0) {
-        tower.cooldown = tower.fireCooldown;
+        tower.cooldown = tower.fireCooldown * this.towerCooldownMul();
         this.fireTower(tower, target);
         const orb = tower.group.getObjectByName('tower-orb') as Mesh | undefined;
         if (orb) {
@@ -1499,28 +2026,42 @@ export class Game {
     if (this.phase !== 'playing' || this.wavePhase !== 'active') return;
     if (this.enemies.length > 0) return;
     if (this.spawnIndex < this.spawnSchedule.length) return;
-    const reward = RULES.waveClearGold(this.wave);
+    const versus = this.runMode === 'versus';
+    const total = this.totalWaves();
+    const reward = Math.round(RULES.waveClearGold(this.wave) * this.waveGoldMul());
     const starReward = RULES.waveClearStar(this.wave);
     this.gold += reward;
     this.star += starReward;
     this.audio.play('harvest');
-    if (this.wave >= RULES.totalWaves) {
-      this.ui.showBanner('最终波', '山野守住了', `最后一波已清除 · +${reward} 金币`, false, 2600);
+    if (versus) {
+      this.applyRivalWave();
+      if (this.phase !== 'playing') return;
+    }
+    if (this.wave >= total) {
+      this.ui.showBanner(
+        versus ? '最终波' : '最终波',
+        versus ? '八波已尽' : '山野守住了',
+        `最后一波已清除 · +${reward} 金币`,
+        false,
+        2600,
+      );
       this.updateHudNow();
-      this.endGame(true);
+      if (versus) this.finishVersus();
+      else this.endGame(true);
       return;
     }
     this.ui.showBanner(
       `第 ${this.wave} 波清除`,
       `+${reward} 金币${starReward ? ` · +${starReward} 星辉` : ''}`,
-      '准备时间开始：开垦新地、补种、到地块上建塔。',
+      versus ? '季令将至：三选一，然后继续对垒。' : '准备时间开始：开垦新地、补种、到地块上建塔。',
       false,
       3200,
     );
     this.ui.toast(`第 ${this.wave} 波清除：+${reward} 金币${starReward ? ` +${starReward} 星辉` : ''}`, 'gold');
     if (starReward > 0) this.ui.toast(`挑战奖励：+${starReward} 星辉`, 'star');
-    this.beginPrep(RULES.prepBetweenWaves);
+    this.beginPrep(this.prepDuration());
     this.updateHudNow();
+    if (versus) this.openBlessing();
   }
 
   /* ───────────────────────────── interaction ───────────────────────────── */
@@ -2038,14 +2579,18 @@ export class Game {
   }
 
   private updateHudNow() {
-    this.ui.setResources(this.gold, this.star, this.lives, RULES.startingLives, this.reclaimedCount(), this.plots.length);
+    this.ui.setResources(this.gold, this.star, this.lives, this.maxLives, this.reclaimedCount(), this.plots.length);
+    if (this.rival) this.ui.setRival(this.rival, this.lives);
+    this.ui.setBlessings(this.blessingEntries());
     if (this.phase !== 'playing' && this.phase !== 'paused') return;
+    const total = this.totalWaves();
+    const waves = this.wavesForRun();
     const previewWave =
       this.wavePhase === 'prep'
-        ? WAVES[Math.min(RULES.totalWaves, this.wave + 1) - 1]
-        : WAVES[Math.max(0, this.wave - 1)];
+        ? waves[Math.min(total, this.wave + 1) - 1]
+        : waves[Math.max(0, this.wave - 1)];
     const groups = previewWave?.groups ?? [];
-    const canStart = this.wavePhase === 'prep' && this.wave < RULES.totalWaves;
+    const canStart = this.wavePhase === 'prep' && this.wave < total;
     const enemiesLeft = this.enemies.length + Math.max(0, this.spawnSchedule.length - this.spawnIndex);
     let progress: number;
     let timer: number;
@@ -2058,8 +2603,8 @@ export class Game {
     }
     this.ui.updateWave({
       mode: this.wavePhase === 'prep' ? 'prep' : 'active',
-      wave: this.wavePhase === 'prep' ? Math.min(RULES.totalWaves, this.wave + 1) : this.wave,
-      total: RULES.totalWaves,
+      wave: this.wavePhase === 'prep' ? Math.min(total, this.wave + 1) : this.wave,
+      total,
       timer,
       progress,
       enemiesLeft,
@@ -2125,16 +2670,42 @@ export class Game {
       getState() {
         return {
           phase: game.phase,
+          runMode: game.runMode,
           mode: game.mode,
+          totalWaves: game.totalWaves(),
           gold: game.gold,
           star: game.star,
           lives: game.lives,
+          maxLives: game.maxLives,
           wave: game.wave,
           wavePhase: game.wavePhase,
           prepRemaining: game.prepRemaining,
           speed: game.speed,
           selectedTool: game.selectedTool,
           selectedTower: game.selectedTower ? { plot: game.selectedTower.plot.index, level: game.selectedTower.level } : null,
+          blessings: { ...game.blessingStacks },
+          blessingOffers: game.blessingOffers.map((choice) => ({
+            id: choice.def.id,
+            name: choice.def.name,
+            rarity: choice.def.rarity,
+            stacks: choice.stacks,
+            maxStacks: choice.def.maxStacks,
+          })),
+          shopOffers: game.shopOffers.map((offer) => ({
+            id: offer.item.id,
+            name: offer.item.name,
+            price: offer.price,
+            sold: offer.sold,
+          })),
+          shopRerollCost: game.shopRerollCost(),
+          shopRerolls: game.shopRerolls,
+          shopPurchases: game.shopPurchases,
+          rival: game.rival ? { ...game.rival } : null,
+          tokens: {
+            freeReclaim: game.freeReclaim,
+            halfUpgrade: game.halfUpgrade,
+            doubleHarvest: game.doubleHarvest,
+          },
           player: {
             x: game.player.position.x,
             z: game.player.position.z,
@@ -2188,11 +2759,14 @@ export class Game {
           pathLength: game.world.path.length,
         };
       },
-      start() {
-        game.startGame();
+      start(mode: RunMode = 'classic') {
+        game.startGame(mode);
+      },
+      startVersus() {
+        game.startGame('versus');
       },
       restart() {
-        game.startGame();
+        game.startGame(game.runMode);
       },
       menu() {
         game.goToMenu();
@@ -2262,6 +2836,35 @@ export class Game {
       upgrade(plot: number) {
         const tower = game.towerAt(plot);
         return tower ? game.upgradeTower(tower) : false;
+      },
+      merge(plot: number) {
+        const tower = game.towerAt(plot);
+        return tower ? game.mergeTower(tower) : false;
+      },
+      selectTowerAt(plot: number) {
+        const tower = game.towerAt(plot);
+        if (!tower) return false;
+        game.selectTowerObject(tower);
+        return true;
+      },
+      canMerge(plot: number) {
+        const tower = game.towerAt(plot);
+        return tower ? !!game.findMergePartner(tower) : false;
+      },
+      chooseBlessing(id: BlessingId) {
+        game.chooseBlessing(id);
+      },
+      blessingChoices() {
+        return game.blessingOffers.map((choice) => choice.def.id);
+      },
+      buyShopItem(id: ShopItemId) {
+        game.buyShopItem(id);
+      },
+      rerollShop() {
+        game.rerollShop();
+      },
+      closeShop() {
+        game.closeShop();
       },
       sell(plot: number) {
         const tower = game.towerAt(plot);

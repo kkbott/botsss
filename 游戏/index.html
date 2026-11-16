@@ -75,6 +75,18 @@
         </div>
       </header>
 
+      <div id="duel-panel" class="duel-panel" hidden>
+        <span class="duel-label">对垒</span>
+        <div class="duel-score">
+          <span class="duel-you">你 <b id="duel-your-lives">12</b></span>
+          <i>:</i>
+          <span class="duel-rival"><b id="duel-rival-lives">12</b> <span id="duel-rival-name">对手</span></span>
+        </div>
+        <small id="duel-rival-wave">对手正在整备</small>
+      </div>
+
+      <div id="blessing-bar" class="blessing-bar" hidden aria-label="本局季令"></div>
+
       <div id="banner" class="banner" aria-live="polite"></div>
 
       <div id="bottom-bar" hidden>
@@ -102,15 +114,15 @@
             <div class="tool-row">
               <button class="tool-card" type="button" data-tower="arrow" aria-pressed="false">
                 <span class="tool-icon">🏹</span>
-                <span class="tool-copy"><b>风语箭塔</b><small><i>🪙</i> 45</small></span>
+                <span class="tool-copy"><b>风语箭塔</b><small><i>🪙</i> 42</small></span>
               </button>
               <button class="tool-card" type="button" data-tower="cannon" aria-pressed="false">
                 <span class="tool-icon">💥</span>
-                <span class="tool-copy"><b>南瓜炮台</b><small><i>🪙</i> 90</small></span>
+                <span class="tool-copy"><b>南瓜炮台</b><small><i>🪙</i> 88</small></span>
               </button>
               <button class="tool-card" type="button" data-tower="star" aria-pressed="false">
                 <span class="tool-icon">🔮</span>
-                <span class="tool-copy"><b>星辉圣坛</b><small><i>✦</i> 2 · <i>🪙</i> 120</small></span>
+                <span class="tool-copy"><b>星辉圣坛</b><small><i>✦</i> 2 · <i>🪙</i> 118</small></span>
               </button>
             </div>
           </section>
@@ -145,6 +157,7 @@
         <p class="inspect-note" id="inspect-note"></p>
         <div class="inspect-actions">
           <button class="btn-primary btn-small" id="btn-upgrade" type="button">升级</button>
+          <button class="btn-ghost btn-small" id="btn-merge" type="button">合成</button>
           <button class="btn-ghost btn-small" id="btn-sell" type="button">拆除</button>
         </div>
       </aside>
@@ -171,19 +184,32 @@
           <h1 class="game-title">穗守</h1>
           <div class="game-title-en">HARVEST &amp; HOLD</div>
           <p class="tagline">种下希望，筑起守望。<br />守住农田，也守住最后一口粮。</p>
+          <div class="menu-modes">
+            <button class="mode-card mode-classic" id="btn-start" type="button">
+              <span class="mode-tag">经典</span>
+              <b>守成</b>
+              <small>6 波 · 20 命 · 熟悉第一人称农作</small>
+            </button>
+            <button class="mode-card mode-versus" id="btn-versus" type="button">
+              <span class="mode-tag">新季</span>
+              <b>对垒</b>
+              <small>8 波 · 12 命 · 三选一季令 · 行商 · 合成</small>
+            </button>
+          </div>
           <div class="menu-actions">
-            <button class="btn-primary btn-hero" id="btn-start" type="button">开始守望</button>
             <button class="btn-ghost" id="btn-howto" type="button">玩法与操作</button>
           </div>
           <ul class="menu-points">
             <li><i>01</i>第一人称走进田野：开垦荒地、播种收获、亲手筑塔</li>
-            <li><i>02</i>一块地只能选一种用途：农田、塔基，还是留作荒地</li>
+            <li><i>02</i>对垒季：波间三选一季令，行商处补给，相邻同阶塔可合成</li>
             <li><i>03</i><b>WASD</b> 移动 · 鼠标看 · <b>E</b> 近处交互 · <b>V</b> 俯瞰布局</li>
           </ul>
           <div class="menu-meta">
             <span id="menu-best">最佳纪录：—</span>
             <span class="dot">·</span>
-            <span>24 块可开垦地 · 6 波 · 约 12 分钟</span>
+            <span id="menu-versus-best">对垒纪录：—</span>
+            <span class="dot">·</span>
+            <span>24 块可开垦地</span>
           </div>
           <div class="menu-credit">CC0 / 可商用素材 · Three.js · 本地运行</div>
         </div>
@@ -215,6 +241,15 @@
                 <li><span class="swatch gold"></span><b>金币</b>：开垦、播种、建塔、修复焦土。</li>
                 <li><span class="swatch star"></span><b>星辉</b>：星辉花产出，建造/升级星辉圣坛与塔升级需要。</li>
                 <li><span class="swatch life"></span><b>生命</b>：漏怪扣生命并烧毁作物，降至 0 即失败。</li>
+              </ul>
+            </section>
+            <section>
+              <h3>对垒季</h3>
+              <ul class="help-list">
+                <li><b>季令</b>：对垒模式第 1–7 波清除后，从三项季令中选一项，整局生效；栏位在屏幕左侧。</li>
+                <li><b>行商</b>：第 2、4、6 波后出现，用金币买星辉、生命、地契、精铁或种子袋；可花金币刷新。</li>
+                <li><b>合成</b>：两座<strong>相邻</strong>且同类型、同等级的塔可以合成高一阶塔，省下升级费，但会空出一块地。</li>
+                <li><b>对垒</b>：对手也在守田。先失去全部生命的一方落败；八波后若都活着，生命多者胜，同命比收获金币。</li>
               </ul>
             </section>
             <section>
@@ -269,6 +304,32 @@
             <button class="btn-ghost" id="btn-back-menu" type="button">返回标题</button>
           </div>
           <div class="end-record" id="end-record"></div>
+        </div>
+      </section>
+
+      <section id="blessing-screen" class="overlay intermission-screen" hidden>
+        <div class="modal modal-intermission">
+          <div class="modal-kicker">SEASON'S CHOICE</div>
+          <h2>选一项季令</h2>
+          <p class="modal-lead" id="blessing-lead">这一波守住了。季风会记住你的选择——三项季令，整局有效。</p>
+          <div class="blessing-grid" id="blessing-cards"></div>
+          <div class="intermission-foot">
+            <span>季令会叠加，达到上限后不再出现。</span>
+            <span id="blessing-progress">第 1 次选择</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="shop-screen" class="overlay intermission-screen" hidden>
+        <div class="modal modal-shop">
+          <div class="modal-kicker">WANDERING MERCHANT</div>
+          <h2>行商歇脚</h2>
+          <p class="modal-lead" id="shop-lead">把金币换成这一季的底气。商品每波只来一次，离开后不再补货。</p>
+          <div class="shop-grid" id="shop-cards"></div>
+          <div class="shop-actions">
+            <button class="btn-ghost btn-small" id="btn-shop-reroll" type="button">刷新商品</button>
+            <button class="btn-primary btn-small" id="btn-shop-close" type="button">继续守望</button>
+          </div>
         </div>
       </section>
 

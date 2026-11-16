@@ -2286,3 +2286,460 @@ body.is-overview #scene:active {
 body.is-touch-play .interact-prompt kbd {
   display: none;
 }
+
+/* ─── Season / versus additions ───────────────────────────────────────── */
+
+.menu-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 30px;
+  max-width: 560px;
+}
+
+.mode-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 16px 17px 14px;
+  border-radius: 15px;
+  text-align: left;
+  color: var(--parchment);
+  background: rgba(22, 38, 27, 0.78);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 8px 26px rgba(5, 12, 8, 0.26);
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  backdrop-filter: blur(8px);
+}
+
+.mode-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold);
+  background: rgba(30, 50, 35, 0.9);
+}
+
+.mode-card b {
+  font-family: var(--display-font);
+  font-size: 24px;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+}
+
+.mode-card small {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--parchment-dim);
+}
+
+.mode-tag {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.mode-classic {
+  color: var(--ink);
+  background-color: var(--gold);
+  background-image: linear-gradient(155deg, #ffd978, var(--gold) 55%, #d9a93d);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 24px rgba(191, 139, 44, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.mode-classic:hover {
+  background-color: var(--gold);
+  background-image: linear-gradient(155deg, #ffd978, var(--gold) 55%, #d9a93d);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.mode-classic b {
+  color: var(--ink);
+}
+
+.mode-classic small,
+.mode-classic .mode-tag {
+  color: rgba(27, 42, 31, 0.72);
+}
+
+.mode-versus {
+  border-color: rgba(243, 196, 85, 0.45);
+  background:
+    radial-gradient(circle at 88% 12%, rgba(243, 196, 85, 0.18), transparent 46%),
+    rgba(28, 48, 34, 0.86);
+}
+
+.mode-versus b {
+  color: var(--gold);
+}
+
+.duel-panel {
+  position: absolute;
+  z-index: 21;
+  top: 92px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 13px;
+  border-radius: 12px;
+  background: rgba(20, 34, 24, 0.82);
+  border: 1px solid rgba(243, 196, 85, 0.3);
+  box-shadow: 0 8px 22px rgba(5, 12, 8, 0.24);
+  backdrop-filter: blur(8px);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.duel-label {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: var(--gold);
+}
+
+.duel-score {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--parchment-dim);
+}
+
+.duel-score b {
+  font-size: 15px;
+  color: var(--parchment);
+}
+
+.duel-score i {
+  font-style: normal;
+  opacity: 0.4;
+}
+
+.duel-rival b {
+  color: var(--coral);
+}
+
+.duel-panel small {
+  font-size: 9px;
+  color: var(--parchment-dim);
+  white-space: nowrap;
+}
+
+.blessing-bar {
+  position: absolute;
+  z-index: 22;
+  left: 16px;
+  bottom: 146px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  max-width: min(520px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.blessing-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 7px;
+  border-radius: 8px;
+  background: rgba(20, 34, 24, 0.82);
+  border: 1px solid var(--line);
+  font-size: 10px;
+  color: var(--parchment-dim);
+  backdrop-filter: blur(6px);
+}
+
+.blessing-chip b {
+  font-size: 11px;
+  color: var(--parchment);
+}
+
+.blessing-chip em {
+  font-style: normal;
+  font-size: 9px;
+  color: var(--gold);
+}
+
+.modal-intermission,
+.modal-shop {
+  width: min(980px, 100%);
+}
+
+.blessing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 13px;
+  margin-top: 24px;
+}
+
+.blessing-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 176px;
+  padding: 18px 17px 15px;
+  border-radius: 15px;
+  text-align: left;
+  color: var(--parchment);
+  background: rgba(27, 45, 32, 0.9);
+  border: 1px solid var(--line-strong);
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.blessing-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--gold);
+  background: rgba(35, 57, 40, 0.96);
+}
+
+.blessing-card:disabled {
+  opacity: 0.45;
+  transform: none;
+}
+
+.blessing-card .blessing-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  font-size: 22px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.blessing-card .blessing-name {
+  font-family: var(--display-font);
+  font-size: 20px;
+  letter-spacing: 0.05em;
+}
+
+.blessing-card .blessing-desc {
+  font-size: 11.5px;
+  line-height: 1.62;
+  color: var(--parchment-dim);
+}
+
+.blessing-card .blessing-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: auto;
+  padding-top: 10px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: rgba(246, 237, 218, 0.5);
+}
+
+.blessing-rarity {
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.blessing-card.is-common .blessing-rarity {
+  color: var(--parchment-dim);
+}
+
+.blessing-card.is-rare .blessing-rarity {
+  color: #8fd0e8;
+}
+
+.blessing-card.is-epic .blessing-rarity {
+  color: var(--gold);
+}
+
+.blessing-card.is-rare {
+  border-color: rgba(143, 208, 232, 0.36);
+}
+
+.blessing-card.is-epic {
+  border-color: rgba(243, 196, 85, 0.5);
+  background:
+    radial-gradient(circle at 88% 8%, rgba(243, 196, 85, 0.16), transparent 46%),
+    rgba(30, 48, 34, 0.94);
+}
+
+.intermission-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 9.5px;
+  color: rgba(246, 237, 218, 0.5);
+}
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 13px;
+  margin-top: 24px;
+}
+
+.shop-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  min-height: 168px;
+  padding: 17px;
+  border-radius: 15px;
+  text-align: left;
+  color: var(--parchment);
+  background: rgba(27, 45, 32, 0.9);
+  border: 1px solid var(--line-strong);
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.shop-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--gold);
+}
+
+.shop-card:disabled,
+.shop-card.is-sold {
+  opacity: 0.42;
+  transform: none;
+}
+
+.shop-card .shop-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  font-size: 20px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.shop-card .shop-name {
+  font-family: var(--display-font);
+  font-size: 19px;
+}
+
+.shop-card .shop-desc {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--parchment-dim);
+}
+
+.shop-card .shop-price {
+  margin-top: auto;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--gold);
+}
+
+.shop-card .shop-price.is-unaffordable {
+  color: var(--coral);
+}
+
+.shop-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+@media (max-width: 980px) {
+  .duel-panel {
+    top: 152px;
+  }
+}
+
+@media (max-width: 760px) {
+  .menu-modes {
+    gap: 8px;
+    margin-top: 20px;
+  }
+  .mode-card {
+    padding: 12px 12px 11px;
+    border-radius: 12px;
+  }
+  .mode-card b {
+    font-size: 20px;
+  }
+  .mode-card small {
+    font-size: 9px;
+  }
+  .duel-panel {
+    top: 116px;
+    gap: 7px;
+    padding: 5px 9px;
+  }
+  .duel-panel small {
+    display: none;
+  }
+  .duel-score {
+    font-size: 10px;
+  }
+  .duel-score b {
+    font-size: 13px;
+  }
+  .blessing-bar {
+    left: 8px;
+    right: 8px;
+    bottom: calc(188px + var(--safe-bottom));
+    max-width: none;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+  .blessing-chip {
+    flex: 0 0 auto;
+  }
+  .blessing-grid,
+  .shop-grid {
+    grid-template-columns: 1fr;
+    gap: 9px;
+    margin-top: 16px;
+  }
+  .blessing-card {
+    min-height: 0;
+    padding: 13px 14px;
+  }
+  .blessing-card .blessing-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 17px;
+  }
+  .blessing-card .blessing-name {
+    font-size: 17px;
+  }
+  .blessing-card .blessing-desc {
+    font-size: 10.5px;
+  }
+  .shop-card {
+    min-height: 0;
+    padding: 13px 14px;
+  }
+  .shop-actions {
+    flex-direction: column-reverse;
+  }
+  .shop-actions button {
+    width: 100%;
+  }
+  .intermission-foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+}
+
+@media (max-width: 390px) {
+  .menu-modes {
+    grid-template-columns: 1fr;
+  }
+}

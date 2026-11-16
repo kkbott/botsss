@@ -1,9 +1,13 @@
 import type {
+  BlessingDef,
+  BlessingId,
   CropDef,
   CropId,
   EnemyDef,
   EnemyId,
   PlotSpec,
+  ShopItemDef,
+  ShopItemId,
   TowerDef,
   TowerId,
   WaveDef,
@@ -340,6 +344,208 @@ export const WAVES: WaveDef[] = [
     ],
   },
 ];
+
+/**
+ * The versus season starts from the same readable six-wave curve, then adds two
+ * "long night" waves. HP/reward multipliers keep the extra waves tense without
+ * introducing a second roster of enemies for the prototype.
+ */
+export const VERSUS_WAVES: WaveDef[] = [
+  ...WAVES,
+  {
+    name: '长夜追猎',
+    hpMul: 1.3,
+    rewardMul: 1.2,
+    groups: [
+      { enemy: 'stag', count: 1, interval: 1, startAt: 0 },
+      { enemy: 'wolf', count: 13, interval: 0.72, startAt: 1.4 },
+      { enemy: 'fox', count: 16, interval: 0.48, startAt: 2.6 },
+      { enemy: 'bull', count: 9, interval: 1.15, startAt: 4.2 },
+    ],
+  },
+  {
+    name: '双王临门',
+    hpMul: 1.35,
+    rewardMul: 1.4,
+    groups: [
+      { enemy: 'stag', count: 2, interval: 5.2, startAt: 0 },
+      { enemy: 'wolf', count: 15, interval: 0.7, startAt: 1.4 },
+      { enemy: 'fox', count: 18, interval: 0.46, startAt: 2.6 },
+      { enemy: 'bull', count: 10, interval: 1.1, startAt: 4.4 },
+    ],
+  },
+];
+
+/** Per-stack values are documented in docs/design-v2.md §季令. */
+export const BLESSINGS: Record<BlessingId, BlessingDef> = {
+  harvest: {
+    id: 'harvest',
+    name: '丰饶之季',
+    icon: '🌾',
+    rarity: 'common',
+    maxStacks: 5,
+    description: '每层：作物收获金币 +15%。',
+  },
+  gale: {
+    id: 'gale',
+    name: '穿林疾风',
+    icon: '🍃',
+    rarity: 'common',
+    maxStacks: 5,
+    description: '每层：防御塔攻击间隔 -7%（最多 -35%）。',
+  },
+  soil: {
+    id: 'soil',
+    name: '沃土之诺',
+    icon: '🟫',
+    rarity: 'common',
+    maxStacks: 3,
+    description: '每层：开垦荒地费用 -10%。',
+  },
+  rain: {
+    id: 'rain',
+    name: '知时好雨',
+    icon: '💧',
+    rarity: 'common',
+    maxStacks: 3,
+    description: '每层：作物生长时间 -8%。',
+  },
+  hawk: {
+    id: 'hawk',
+    name: '鹰眼守望',
+    icon: '👁',
+    rarity: 'rare',
+    maxStacks: 3,
+    description: '每层：防御塔射程 +8%。',
+  },
+  workshop: {
+    id: 'workshop',
+    name: '匠人夜话',
+    icon: '🔨',
+    rarity: 'rare',
+    maxStacks: 2,
+    description: '每层：防御塔升级金币费用 -15%。',
+  },
+  starlight: {
+    id: 'starlight',
+    name: '星辉共振',
+    icon: '✦',
+    rarity: 'rare',
+    maxStacks: 2,
+    description: '每层：收获星辉花时额外 +1 星辉。',
+  },
+  bulwark: {
+    id: 'bulwark',
+    name: '坚壁清野',
+    icon: '🛡',
+    rarity: 'rare',
+    maxStacks: 2,
+    description: '每层：生命上限 +2，并立即回复 2 点生命。',
+  },
+  bargain: {
+    id: 'bargain',
+    name: '行商旧识',
+    icon: '🪙',
+    rarity: 'rare',
+    maxStacks: 2,
+    description: '每层：行商商品价格 -15%。',
+  },
+  spoils: {
+    id: 'spoils',
+    name: '战利品',
+    icon: '🎖',
+    rarity: 'epic',
+    maxStacks: 1,
+    description: '每波清除奖励金币 +40%。',
+  },
+  thorns: {
+    id: 'thorns',
+    name: '荆棘篱墙',
+    icon: '🌵',
+    rarity: 'epic',
+    maxStacks: 1,
+    description: '每次漏怪的核心伤害 -1（最低 1 点）。',
+  },
+  seed: {
+    id: 'seed',
+    name: '双生麦穗',
+    icon: '🌱',
+    rarity: 'epic',
+    maxStacks: 2,
+    description: '每层：收获时有 20% 概率获得双倍金币。',
+  },
+  confluence: {
+    id: 'confluence',
+    name: '合流之术',
+    icon: '🔀',
+    rarity: 'epic',
+    maxStacks: 1,
+    description: '合成防御塔时，返还被合并塔 50% 的建造金币。',
+  },
+  merchant: {
+    id: 'merchant',
+    name: '季前囤货',
+    icon: '📦',
+    rarity: 'epic',
+    maxStacks: 1,
+    description: '每次行商多展示 1 件商品。',
+  },
+};
+
+export const SHOP_ITEMS: Record<ShopItemId, ShopItemDef> = {
+  starVial: {
+    id: 'starVial',
+    name: '星辉瓶',
+    icon: '✦',
+    basePrice: 55,
+    description: '立刻获得 2 星辉。',
+  },
+  lifeCharm: {
+    id: 'lifeCharm',
+    name: '护田符',
+    icon: '❤',
+    basePrice: 75,
+    description: '生命上限 +2，并立即回复 2 点生命。',
+  },
+  deed: {
+    id: 'deed',
+    name: '地契',
+    icon: '📜',
+    basePrice: 50,
+    description: '下一次开垦荒地免费。',
+  },
+  iron: {
+    id: 'iron',
+    name: '精铁',
+    icon: '🔧',
+    basePrice: 65,
+    description: '下一次防御塔升级的金币费用减半。',
+  },
+  seedPouch: {
+    id: 'seedPouch',
+    name: '种子袋',
+    icon: '🌾',
+    basePrice: 45,
+    description: '下一次作物收获获得双倍金币。',
+  },
+};
+
+export const VERSUS_RULES = {
+  startingGold: 165,
+  startingLives: 12,
+  firstPrep: 24,
+  prepBetweenWaves: 16,
+  /** Waves after which the merchant visits (never after the final wave). */
+  shopWaves: [2, 4, 6],
+  shopRerollBase: 15,
+  shopRerollStep: 10,
+  /** Base leaks the AI rival takes on each of the eight waves. */
+  rivalLeaks: [0, 1, 1, 1, 2, 2, 2, 2],
+  rivalStartLives: 12,
+  /** Cosmetic rival identities; the run picks one deterministically. */
+  rivalNames: ['北坡·老秦', '溪口·阿禾', '石桥·小满', '南坳·十七', '河东·麦生', '西岭·秋娘'],
+  rivalTitles: ['守田人', '季风客', '观星者', '老农'],
+} as const;
 
 export const RULES = {
   startingGold: 150,

@@ -1,7 +1,36 @@
 export type CropId = 'wheat' | 'pumpkin' | 'flower';
 export type TowerId = 'arrow' | 'cannon' | 'star';
 export type EnemyId = 'fox' | 'wolf' | 'bull' | 'stag';
-export type GamePhase = 'loading' | 'menu' | 'playing' | 'paused' | 'victory' | 'defeat';
+/** Classic is the six-wave tutorial; versus is the 1v1 roguelike season. */
+export type RunMode = 'classic' | 'versus';
+export type GamePhase =
+  | 'loading'
+  | 'menu'
+  | 'playing'
+  | 'paused'
+  /** Between-wave roguelike choice; the simulation is frozen. */
+  | 'blessing'
+  /** Between-wave merchant; the simulation is frozen. */
+  | 'shop'
+  | 'victory'
+  | 'defeat';
+export type BlessingRarity = 'common' | 'rare' | 'epic';
+export type BlessingId =
+  | 'harvest'
+  | 'gale'
+  | 'soil'
+  | 'rain'
+  | 'hawk'
+  | 'workshop'
+  | 'starlight'
+  | 'bulwark'
+  | 'bargain'
+  | 'spoils'
+  | 'thorns'
+  | 'seed'
+  | 'confluence'
+  | 'merchant';
+export type ShopItemId = 'starVial' | 'lifeCharm' | 'deed' | 'iron' | 'seedPouch';
 export type WavePhase = 'prep' | 'active' | 'cleared';
 export type Quality = 'high' | 'low';
 /** First-person is the default; the old orbit camera survives as a switchable overview. */
@@ -77,6 +106,10 @@ export interface WaveGroup {
 export interface WaveDef {
   name: string;
   groups: WaveGroup[];
+  /** Optional per-wave health multiplier used by the versus season. */
+  hpMul?: number;
+  /** Optional per-wave kill-reward multiplier used by the versus season. */
+  rewardMul?: number;
 }
 
 export interface PlotSpec {
@@ -154,6 +187,48 @@ export interface FloatingText {
   rise: number;
 }
 
+export interface BlessingDef {
+  id: BlessingId;
+  name: string;
+  icon: string;
+  rarity: BlessingRarity;
+  maxStacks: number;
+  /** Short, player-facing explanation of one stack. */
+  description: string;
+}
+
+export interface BlessingChoice {
+  def: BlessingDef;
+  stacks: number;
+}
+
+export interface ShopItemDef {
+  id: ShopItemId;
+  name: string;
+  icon: string;
+  basePrice: number;
+  description: string;
+}
+
+export interface ShopOffer {
+  item: ShopItemDef;
+  price: number;
+  sold: boolean;
+}
+
+export interface RivalState {
+  name: string;
+  title: string;
+  lives: number;
+  maxLives: number;
+  wave: number;
+  harvest: number;
+  skill: number;
+  /** One deterministic mistake wave per some runs, for variety. */
+  mistakeWave: number | null;
+  alive: boolean;
+}
+
 export interface GameStats {
   kills: number;
   harvestedGold: number;
@@ -163,10 +238,14 @@ export interface GameStats {
   leaks: number;
   playSeconds: number;
   reclaimed: number;
+  merges: number;
+  blessings: number;
 }
 
 export interface SaveData {
   bestWave: number;
   victories: number;
+  versusWins: number;
+  versusBestWave: number;
   muted: boolean;
 }

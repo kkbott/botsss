@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-10T16:00:21.860Z",
+  "startedAt": "2026-11-16T10:43:13.875Z",
   "environment": {
     "platform": "darwin",
     "arch": "arm64",
@@ -16,8 +16,8 @@
   "build": {
     "ok": true,
     "exitCode": 0,
-    "durationMs": 436,
-    "outputTail": "computing gzip size...\ndist/index.html                  15.39 kB │ gzip:   4.66 kB\ndist/assets/index-CM_kQZD9.css   31.29 kB │ gzip:   7.71 kB\ndist/assets/index-CDK-zWIR.js   821.49 kB │ gzip: 215.71 kB\n\n✓ built in 152ms\n\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
+    "durationMs": 370,
+    "outputTail": "computing gzip size...\ndist/index.html                  18.70 kB │ gzip:   5.59 kB\ndist/assets/index-Djn3gnt7.css   37.86 kB │ gzip:   8.72 kB\ndist/assets/index-CGn3ow17.js   842.95 kB │ gzip: 222.55 kB\n\n✓ built in 136ms\n\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
   },
   "assets": {
     "loaded": 69,
@@ -84,12 +84,12 @@
     {
       "name": "WASD walks the first-person character",
       "ok": true,
-      "details": "moved 1.52m"
+      "details": "moved 2.49m"
     },
     {
       "name": "the camera follows the character eye position",
       "ok": true,
-      "details": "camera 6.42, 1.65, 1.58"
+      "details": "camera 5.53, 1.63, 1.18"
     },
     {
       "name": "mouse look changes the first-person view",
@@ -99,7 +99,7 @@
     {
       "name": "Space jumps and lands again",
       "ok": true,
-      "details": "jump height 0.40m"
+      "details": "jump height 0.35m"
     },
     {
       "name": "the character lands back on the ground",
@@ -254,12 +254,92 @@
     {
       "name": "a busy first-person farm scene renders near 60 fps",
       "ok": true,
-      "details": "60.1 fps average, p95 18.3 ms, 146 draw calls, 264480 triangles"
+      "details": "60.1 fps average, p95 17.8 ms, 146 draw calls, 264480 triangles"
+    },
+    {
+      "name": "versus mode starts with eight waves, twelve lives and a rival",
+      "ok": true,
+      "details": "versus, 12 lives, rival 石桥·小满"
+    },
+    {
+      "name": "the duel HUD names the rival and shows both life totals",
+      "ok": true,
+      "details": "对垒\n你 12\n:\n12 石桥·小满\n季风客 · 已守 0 波"
+    },
+    {
+      "name": "two adjacent same-level towers expose a merge action",
+      "ok": true,
+      "details": "合成 Lv.2"
+    },
+    {
+      "name": "merging consumes the adjacent tower, upgrades the selected one and frees its land",
+      "ok": true,
+      "details": "{\"towers\":[{\"id\":\"arrow\",\"plot\":18,\"level\":2,\"damage\":22,\"range\":6.9}],\"plot19\":\"wild\",\"merges\":1}"
+    },
+    {
+      "name": "clearing a versus wave opens the three-choice blessing screen",
+      "ok": true,
+      "details": "blessing, offers gale,rain,soil"
+    },
+    {
+      "name": "choosing a blessing adds a stack and resumes the run",
+      "ok": true,
+      "details": "gale ×1, phase playing"
+    },
+    {
+      "name": "the blessing bar shows the chosen season",
+      "ok": true,
+      "details": "🍃\n穿林疾风\n×1"
+    },
+    {
+      "name": "the merchant visits after the second versus wave",
+      "ok": true,
+      "details": "shop, offers lifeCharm,iron,seedPouch"
+    },
+    {
+      "name": "the rival takes leaks as the duel progresses",
+      "ok": true,
+      "details": "rival 11/12"
+    },
+    {
+      "name": "the merchant limits a visit to two purchases",
+      "ok": true,
+      "details": "purchases 2, gold 1323"
+    },
+    {
+      "name": "rerolling the merchant costs gold and refreshes the offers",
+      "ok": true,
+      "details": "gold 1323 → 1308, rerolls 1"
+    },
+    {
+      "name": "closing the merchant resumes the run",
+      "ok": true,
+      "details": "playing"
+    },
+    {
+      "name": "a versus run reaches a win or loss after the eight-wave state machine",
+      "ok": true,
+      "details": "{\"phase\":\"victory\",\"wave\":8,\"lives\":12,\"maxLives\":12,\"rivalLives\":0,\"blessings\":7,\"merges\":5,\"totalWaves\":8}"
+    },
+    {
+      "name": "the versus victory end screen reports the duel outcome",
+      "ok": true,
+      "details": "对垒胜利"
+    },
+    {
+      "name": "versus mode can end in defeat when the player loses all lives",
+      "ok": true,
+      "details": "defeat, lives 0, rival 11"
     },
     {
       "name": "mobile start screen is usable",
       "ok": true,
       "details": "390×844"
+    },
+    {
+      "name": "mobile menu exposes both classic and versus modes",
+      "ok": true,
+      "details": "390×844 mode cards"
     },
     {
       "name": "mobile HUD, joystick and interact button fit without overflow",
@@ -274,7 +354,17 @@
     {
       "name": "tapping the mobile interact button starts reclamation",
       "ok": true,
-      "details": "reclaim progress 0.22"
+      "details": "reclaim progress 0.21"
+    },
+    {
+      "name": "mobile versus HUD fits without horizontal overflow",
+      "ok": true,
+      "details": "{\"documentWidth\":390,\"viewportWidth\":390,\"visible\":true,\"duel\":{\"x\":119.796875,\"y\":116,\"w\":150.40625,\"h\":30,\"right\":270.203125,\"bottom\":146}}"
+    },
+    {
+      "name": "mobile blessing modal stacks three readable cards without overflow",
+      "ok": true,
+      "details": "{\"phase\":\"blessing\",\"cards\":3,\"modal\":{\"x\":12.019149780273438,\"y\":79.20782470703125,\"width\":365.961669921875,\"height\":685.61572265625,\"top\":79.20782470703125,\"right\":377.98081970214844,\"bottom\":764.8235473632812,\"left\":12.019149780273438},\"documentWidth\":390,\"viewportWidth\":390}"
     },
     {
       "name": "Kenney CC0 licence file is present",
@@ -315,12 +405,12 @@
   "consoleErrors": [],
   "fps": {
     "frames": 301,
-    "averageMs": 16.6485049833491,
-    "p95Ms": 18.30000001192093,
-    "fpsAverage": 60.06545338456179,
-    "fpsP95": 54.64480870757285,
+    "averageMs": 16.644850498337632,
+    "p95Ms": 17.800000000745058,
+    "fpsAverage": 60.0786411448918,
+    "fpsP95": 56.179775278547346,
     "metrics": {
-      "fps": 59.99999999999997,
+      "fps": 60.00774293457226,
       "calls": 146,
       "triangles": 264480,
       "pixelRatio": 1,
@@ -464,21 +554,24 @@
       "planted": 202,
       "towersBuilt": 14,
       "leaks": 0,
-      "playSeconds": 297.5166666667212,
-      "reclaimed": 10
+      "playSeconds": 297.70000000005433,
+      "reclaimed": 10,
+      "merges": 0,
+      "blessings": 0
     }
   },
   "screenshots": [
     "docs/screenshots/after-defeat.png",
     "docs/screenshots/after-victory.png",
     "docs/screenshots/after-mobile-menu.png",
-    "docs/screenshots/after-mobile-game.png"
+    "docs/screenshots/after-mobile-game.png",
+    "docs/screenshots/after-mobile-versus.png"
   ],
-  "finishedAt": "2026-11-10T16:00:51.944Z",
+  "finishedAt": "2026-11-16T10:43:51.213Z",
   "passed": true,
   "summary": {
-    "total": 57,
-    "passed": 57,
+    "total": 75,
+    "passed": 75,
     "failed": 0
   }
 }
