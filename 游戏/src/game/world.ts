@@ -49,7 +49,9 @@ import { PATH_POINTS, PLOTS, WORLD } from './config';
 import type { PlotRuntime, PlotSpec } from './types';
 import {
   makeBarrel,
+  makeBambooGrove,
   makeCrate,
+  makeDryingRack,
   makeFenceSegment,
   makeFlower,
   makeGrassTuft,
@@ -62,9 +64,11 @@ import {
   makePortal,
   makeRock,
   makeRoundTree,
+  makeScarecrow,
   makeShrineCore,
   makeStatue,
   makeTent,
+  makeTerraces,
   makeWell,
   makeWindmill,
 } from './models';
@@ -143,11 +147,11 @@ function skyDome(): Mesh {
     depthWrite: false,
     fog: false,
     uniforms: {
-      topColor: { value: new Color(0x6fa8cc) },
-      midColor: { value: new Color(0xf9ddb3) },
-      bottomColor: { value: new Color(0xbdd3dd) },
+      topColor: { value: new Color(0xcfd9d3) },
+      midColor: { value: new Color(0xf4ecdc) },
+      bottomColor: { value: new Color(0xe8dfce) },
       sunDirection: { value: new Vector3(-0.55, 0.36, 0.42).normalize() },
-      sunColor: { value: new Color(0xffe6b8) },
+      sunColor: { value: new Color(0xffedc7) },
     },
     vertexShader: /* glsl */ `
       varying vec3 vDir;
@@ -212,7 +216,7 @@ function makeCloud(random: () => number): Group {
     const puff = new Mesh(
       new IcosahedronGeometry(1, 1),
       new MeshStandardMaterial({
-        color: 0xfaf2df,
+        color: 0xfbf8f0,
         roughness: 1,
         flatShading: true,
       }),
@@ -331,16 +335,16 @@ export class World {
       alpha: false,
       stencil: false,
     });
-    this.renderer.setClearColor(0xd9c9a8, 1);
+    this.renderer.setClearColor(0xeee7d8, 1);
     this.renderer.outputColorSpace = SRGBColorSpace;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = PCFShadowMap;
-    this.renderer.toneMappingExposure = 1.12;
+    this.renderer.toneMappingExposure = 1.14;
     const pixelRatio = Math.min(window.devicePixelRatio, this.isNarrow() ? 1.6 : 2);
     this.renderer.setPixelRatio(pixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight, false);
 
-    this.scene.fog = new Fog(0xd8c8a8, 70, 165);
+    this.scene.fog = new Fog(0xeee7d8, 64, 172);
     this.camera = new PerspectiveCamera(WORLD.camera.overviewFov, window.innerWidth / window.innerHeight, 0.06, 420);
     this.camera.position.copy(this.menuCamera);
     this.camera.lookAt(this.menuTarget);
@@ -423,11 +427,11 @@ export class World {
   }
 
   private addLights() {
-    const hemisphere = new HemisphereLight(0xc9e3ff, 0x5f7041, 1.3);
+    const hemisphere = new HemisphereLight(0xf6f1e4, 0x9a8e7b, 1.8);
     this.scene.add(hemisphere);
-    this.scene.add(new AmbientLight(0xffe8c9, 0.3));
+    this.scene.add(new AmbientLight(0xfff4df, 0.46));
 
-    const sun = new DirectionalLight(0xffd7a0, 2.8);
+    const sun = new DirectionalLight(0xffe8bf, 2.2);
     sun.position.set(-28, 42, 24);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -445,17 +449,17 @@ export class World {
     this.scene.add(target);
     sun.target = target;
 
-    const fill = new DirectionalLight(0xa8cfe8, 0.4);
+    const fill = new DirectionalLight(0xe4ebe4, 0.8);
     fill.position.set(16, 12, -18);
     this.scene.add(fill);
   }
 
   private buildIsland() {
     const g = this.island;
-    const cliff = new MeshStandardMaterial({ color: 0x786f5d, roughness: 1, flatShading: true });
-    const cliffDark = new MeshStandardMaterial({ color: 0x5e5849, roughness: 1, flatShading: true });
-    const grass = new MeshStandardMaterial({ color: 0x789f55, roughness: 1, flatShading: true });
-    const grassEdge = new MeshStandardMaterial({ color: 0x6b944d, roughness: 1, flatShading: true });
+    const cliff = new MeshStandardMaterial({ color: 0x9a9180, roughness: 1, flatShading: true });
+    const cliffDark = new MeshStandardMaterial({ color: 0x7b7568, roughness: 1, flatShading: true });
+    const grass = new MeshStandardMaterial({ color: 0x9aa985, roughness: 1, flatShading: true });
+    const grassEdge = new MeshStandardMaterial({ color: 0x89997a, roughness: 1, flatShading: true });
 
     const geo = new CylinderGeometry(WORLD.island.rx, WORLD.island.rx * 0.56, 10.4, 30, 6, false);
     geo.scale(1, 1, WORLD.island.rz / WORLD.island.rx);
@@ -524,7 +528,7 @@ export class World {
     }
 
     // Warm grass mounds give the flat top a hand-made silhouette.
-    const moundMat = new MeshStandardMaterial({ color: 0x82a95c, roughness: 1, flatShading: true });
+    const moundMat = new MeshStandardMaterial({ color: 0xa2af8d, roughness: 1, flatShading: true });
     for (let i = 0; i < 7; i++) {
       const mound = new Mesh(new SphereGeometry(1.2 + this.random() * 1.8, 7, 5), moundMat);
       const angle = this.random() * Math.PI * 2;
@@ -540,8 +544,8 @@ export class World {
   }
 
   private buildPath() {
-    const outer = makeRibbon(this.path.curve, WORLD.pathWidth + 0.55, 0x9b8057, WORLD.pathY - 0.005, 0.03);
-    const inner = makeRibbon(this.path.curve, WORLD.pathWidth, 0xcbb081, WORLD.pathY + 0.008, 0.04);
+    const outer = makeRibbon(this.path.curve, WORLD.pathWidth + 0.55, 0xb4a58a, WORLD.pathY - 0.005, 0.03);
+    const inner = makeRibbon(this.path.curve, WORLD.pathWidth, 0xd2c6ae, WORLD.pathY + 0.008, 0.04);
     this.staticParts.add(outer, inner);
 
     for (let i = 0; i < 28; i++) {
@@ -579,14 +583,14 @@ export class World {
     const end = this.path.curve.getPointAt(1);
     const startRing = new Mesh(
       new RingGeometry(0.9, 1.25, 30),
-      new MeshBasicMaterial({ color: 0x9d7bff, transparent: true, opacity: 0.35, side: DoubleSide }),
+      new MeshBasicMaterial({ color: 0xa84b38, transparent: true, opacity: 0.28, side: DoubleSide }),
     );
     startRing.rotation.x = -Math.PI / 2;
     startRing.position.set(start.x, 0.06, start.z);
     this.staticParts.add(startRing);
     const endRing = new Mesh(
       new RingGeometry(1.7, 2.0, 36),
-      new MeshBasicMaterial({ color: 0xf3c455, transparent: true, opacity: 0.28, side: DoubleSide }),
+      new MeshBasicMaterial({ color: 0xe6d6a4, transparent: true, opacity: 0.26, side: DoubleSide }),
     );
     endRing.rotation.x = -Math.PI / 2;
     endRing.position.set(end.x, 0.06, end.z);
@@ -594,15 +598,15 @@ export class World {
   }
 
   private buildFarm() {
-    const soil = new MeshStandardMaterial({ color: 0x6d4f34, roughness: 1, flatShading: true });
-    const soilDark = new MeshStandardMaterial({ color: 0x543c28, roughness: 1, flatShading: true });
-    const soilLight = new MeshStandardMaterial({ color: 0x7d5c3c, roughness: 1, flatShading: true });
-    const wood = new MeshStandardMaterial({ color: 0x9b7042, roughness: 1, flatShading: true });
-    const wildSods = [0x5f8a46, 0x679349, 0x5a8142].map((color) => new MeshStandardMaterial({ color, roughness: 1, flatShading: true }));
-    const patchMaterials = [0x6f9a4f, 0x557c40, 0x7aa65a].map((color) => new MeshStandardMaterial({ color, roughness: 1, flatShading: true }));
-    const weed = new MeshStandardMaterial({ color: 0x5a8442, roughness: 1, flatShading: true });
-    const charred = new MeshStandardMaterial({ color: 0x302c26, roughness: 1, flatShading: true });
-    const glow = new MeshBasicMaterial({ color: 0xf3c455, transparent: true, opacity: 0.3, side: DoubleSide });
+    const soil = new MeshStandardMaterial({ color: 0x9a7c58, roughness: 1, flatShading: true });
+    const soilDark = new MeshStandardMaterial({ color: 0x7f6549, roughness: 1, flatShading: true });
+    const soilLight = new MeshStandardMaterial({ color: 0xac8d68, roughness: 1, flatShading: true });
+    const wood = new MeshStandardMaterial({ color: 0x8e7a5d, roughness: 1, flatShading: true });
+    const wildSods = [0x8d9b79, 0x96a482, 0x869674].map((color) => new MeshStandardMaterial({ color, roughness: 1, flatShading: true }));
+    const patchMaterials = [0x9caa86, 0x879878, 0xa8b494].map((color) => new MeshStandardMaterial({ color, roughness: 1, flatShading: true }));
+    const weed = new MeshStandardMaterial({ color: 0x83926f, roughness: 1, flatShading: true });
+    const charred = new MeshStandardMaterial({ color: 0x3c3932, roughness: 1, flatShading: true });
+    const glow = new MeshBasicMaterial({ color: 0xe6d6a4, transparent: true, opacity: 0.34, side: DoubleSide });
     const size = WORLD.farm.plotSize;
     const half = size / 2;
 
@@ -669,7 +673,7 @@ export class World {
         wild.add(patch);
       }
       for (let i = 0; i < 14; i++) {
-        const tuft = makeGrassTuft(0.22 + this.random() * 0.3, i % 3 === 0 ? 0x88b366 : 0x6f9a4f);
+        const tuft = makeGrassTuft(0.22 + this.random() * 0.3, i % 3 === 0 ? 0xa9b591 : 0x8d9d7b);
         tuft.position.set((this.random() - 0.5) * (size - 0.35), 0.14, (this.random() - 0.5) * (size - 0.35));
         wild.add(tuft);
       }
@@ -681,7 +685,7 @@ export class World {
         wild.add(weedStem);
       }
       for (let i = 0; i < 2; i++) {
-        const rock = makeRock(0.09 + this.random() * 0.09, i % 2 ? 0x8a897a : 0x74756a);
+        const rock = makeRock(0.09 + this.random() * 0.09, i % 2 ? 0xbfb7a6 : 0xa8a292);
         rock.position.set((this.random() - 0.5) * (size - 0.35), 0.1, (this.random() - 0.5) * (size - 0.35));
         wild.add(rock);
       }
@@ -695,21 +699,21 @@ export class World {
 
       /* ── stone footing while a tower occupies the plot ── */
       const towerBase = new Group();
-      const footing = new Mesh(new CylinderGeometry(1.05, 1.15, 0.18, 9), new MeshStandardMaterial({ color: 0x8d8d7a, roughness: 1, flatShading: true }));
+      const footing = new Mesh(new CylinderGeometry(1.05, 1.15, 0.18, 9), new MeshStandardMaterial({ color: 0xb2ab9b, roughness: 1, flatShading: true }));
       footing.position.y = 0.2;
       footing.receiveShadow = true;
       footing.castShadow = true;
       towerBase.add(footing);
       const inset = new Mesh(
         new CylinderGeometry(0.72, 0.8, 0.1, 9),
-        new MeshStandardMaterial({ color: 0x6b6d5d, roughness: 1, flatShading: true }),
+        new MeshStandardMaterial({ color: 0x8b897a, roughness: 1, flatShading: true }),
       );
       inset.position.y = 0.33;
       inset.receiveShadow = true;
       towerBase.add(inset);
       const runeRing = new Mesh(
         new TorusGeometry(0.84, 0.027, 4, 26),
-        new MeshBasicMaterial({ color: 0xa8c97b, transparent: true, opacity: 0.5, side: DoubleSide }),
+        new MeshBasicMaterial({ color: 0x9aa985, transparent: true, opacity: 0.5, side: DoubleSide }),
       );
       runeRing.rotation.x = Math.PI / 2;
       runeRing.position.y = 0.34;
@@ -828,22 +832,22 @@ export class World {
 
     const glow = new Mesh(
       new RingGeometry(2.5, 3.2, 48),
-      new MeshBasicMaterial({ color: 0xf3c455, transparent: true, opacity: 0.11, side: DoubleSide }),
+      new MeshBasicMaterial({ color: 0xe6d6a4, transparent: true, opacity: 0.13, side: DoubleSide }),
     );
     glow.rotation.x = -Math.PI / 2;
     glow.position.set(core.x, 0.07, core.z);
     this.staticParts.add(glow);
 
     const tree = this.envInstance('tree_common', 4.8, { maxWidth: 4.6 }) ?? makeRoundTree(4.8, 1);
-    tree.position.set(core.x + 7.2, 0, core.z - 3.0);
+    tree.position.set(core.x + 8.6, 0, core.z + 5.2);
     tree.rotation.y = 0.4;
     this.staticParts.add(tree);
-    this.treeObstacles.push({ x: core.x + 7.2, z: core.z - 3.0, r: 0.5 });
+    this.treeObstacles.push({ x: core.x + 8.6, z: core.z + 5.2, r: 0.5 });
     const tree2 = this.envInstance('pine_tall', 4.2, { maxWidth: 2.4 }) ?? makePineTree(4.2, 2);
-    tree2.position.set(core.x + 4.4, 0, core.z - 1.4);
+    tree2.position.set(core.x + 5.2, 0, core.z + 7.0);
     tree2.rotation.y = 1.2;
     this.staticParts.add(tree2);
-    this.treeObstacles.push({ x: core.x + 4.4, z: core.z - 1.4, r: 0.45 });
+    this.treeObstacles.push({ x: core.x + 5.2, z: core.z + 7.0, r: 0.45 });
 
     const fence = this.prop('fence', 1.0, () => makeFenceSegment(2.3));
     fence.position.set(core.x + 3.0, 0, core.z + 2.8);
@@ -851,7 +855,7 @@ export class World {
     this.staticParts.add(fence);
 
     const beaconMaterial = new MeshBasicMaterial({
-      color: 0x9de9ff,
+      color: 0xe6d6a4,
       transparent: true,
       opacity: 0.07,
       depthWrite: false,
@@ -865,7 +869,7 @@ export class World {
     this.scene.add(beacon);
     const beaconInner = new Mesh(
       new CylinderGeometry(0.06, 0.18, 5.2, 8, 1, true),
-      new MeshBasicMaterial({ color: 0xfff0c9, transparent: true, opacity: 0.14, depthWrite: false, blending: 2 }),
+      new MeshBasicMaterial({ color: 0xfff3d6, transparent: true, opacity: 0.16, depthWrite: false, blending: 2 }),
     );
     beaconInner.position.set(core.x, 2.8, core.z);
     this.scene.add(beaconInner);
@@ -883,7 +887,7 @@ export class World {
 
     const light = new Mesh(
       new CircleGeometry(1.9, 30),
-      new MeshBasicMaterial({ color: 0x7a5ecf, transparent: true, opacity: 0.16, side: DoubleSide }),
+      new MeshBasicMaterial({ color: 0xa84b38, transparent: true, opacity: 0.12, side: DoubleSide }),
     );
     light.rotation.x = -Math.PI / 2;
     light.position.set(spawn.x, 0.06, spawn.z);
@@ -905,7 +909,7 @@ export class World {
 
   private buildFarmstead() {
     const d = WORLD.decorations;
-    const house = this.prop('house', 3.45, () => makeHouse(), { fallbackScale: 1.35 });
+    const house = this.prop('house', 3.45, () => makeHouse(), { fallbackScale: 1.05 });
     house.position.set(d.farmhouse.x, 0, d.farmhouse.z);
     house.rotation.y = d.farmhouse.rotation;
     this.staticParts.add(house);
@@ -953,7 +957,7 @@ export class World {
     barrel.position.set(d.crates.x + 0.25, 0, d.crates.z + 1.1);
     this.staticParts.add(barrel);
 
-    const tent = this.prop('tent', 2.1, () => makeTent(), { fallbackScale: 0.8 });
+    const tent = this.prop('tent', 2.1, () => makeTent(), { fallbackScale: 1.0 });
     tent.position.set(d.tent.x, 0, d.tent.z);
     tent.rotation.y = d.tent.rotation;
     this.staticParts.add(tent);
@@ -972,6 +976,82 @@ export class World {
     firewood.position.set(d.campfire.x, 0, d.campfire.z);
     firewood.rotation.y = d.campfire.rotation;
     this.staticParts.add(firewood);
+
+    this.buildPastoralLandmarks();
+  }
+
+  /** Terraces, bamboo, drying racks and field landmarks that define the
+   * Chinese-pastoral silhouette of the island. All are white-box placeholders. */
+  private buildPastoralLandmarks() {
+    const terraces = makeTerraces(12, 6.2);
+    terraces.position.set(17.0, 0, 1.6);
+    terraces.rotation.y = -0.42;
+    this.staticParts.add(terraces);
+    this.treeObstacles.push({ x: 17.0, z: 1.6, r: 4.4 });
+
+    const bamboo = makeBambooGrove(4.6, 9);
+    bamboo.position.set(-14.8, 0, 12.4);
+    this.staticParts.add(bamboo);
+    this.treeObstacles.push({ x: -14.8, z: 12.4, r: 1.0 });
+
+    const bamboo2 = makeBambooGrove(3.8, 7);
+    bamboo2.position.set(-9.2, 0, -13.8);
+    bamboo2.rotation.y = 0.8;
+    this.staticParts.add(bamboo2);
+    this.treeObstacles.push({ x: -9.2, z: -13.8, r: 0.9 });
+
+    const rack = makeDryingRack();
+    rack.position.set(-16.2, 0, 8.4);
+    rack.rotation.y = 0.35;
+    this.staticParts.add(rack);
+    this.treeObstacles.push({ x: -16.2, z: 8.4, r: 1.15 });
+
+    const scarecrow = makeScarecrow();
+    scarecrow.position.set(-11.6, 0, -8.1);
+    scarecrow.rotation.y = -0.4;
+    this.staticParts.add(scarecrow);
+    this.treeObstacles.push({ x: -11.6, z: -8.1, r: 0.55 });
+
+    for (const [x, z, rotation] of [
+      [13.2, -8.4, 0.2],
+      [-12.6, 3.8, -0.4],
+      [6.6, 7.6, 0.5],
+    ] as const) {
+      const lantern = makeStatue();
+      lantern.position.set(x, 0, z);
+      lantern.rotation.y = rotation;
+      lantern.scale.setScalar(1.12);
+      this.staticParts.add(lantern);
+      this.treeObstacles.push({ x, z, r: 0.55 });
+    }
+
+    // A small rice paddy beside the pond: shallow water, stone lip and young rice.
+    const pond = WORLD.decorations.pond;
+    const paddy = new Group();
+    paddy.position.set(pond.x - 4.6, 0.02, pond.z + 1.7);
+    const water = new Mesh(
+      new PlaneGeometry(3.2, 2.0),
+      new MeshStandardMaterial({ color: 0xb9c9c0, roughness: 0.35, metalness: 0.05, transparent: true, opacity: 0.88 }),
+    );
+    water.rotation.x = -Math.PI / 2;
+    paddy.add(water);
+    for (let i = 0; i < 4; i++) {
+      const lip = makeFenceSegment(3.0);
+      lip.position.set(0, 0, i < 2 ? (i === 0 ? -1.05 : 1.05) : 0);
+      if (i >= 2) {
+        lip.position.set(i === 2 ? -1.65 : 1.65, 0, 0);
+        lip.rotation.y = Math.PI / 2;
+      }
+      lip.scale.setScalar(0.55);
+      paddy.add(lip);
+    }
+    for (let i = 0; i < 14; i++) {
+      const rice = makeGrassTuft(0.26, 0x9aa985);
+      rice.position.set((this.random() - 0.5) * 2.7, 0.02, (this.random() - 0.5) * 1.7);
+      paddy.add(rice);
+    }
+    this.staticParts.add(paddy);
+    this.treeObstacles.push({ x: pond.x - 4.6, z: pond.z + 1.7, r: 1.9 });
   }
 
   private buildPond() {
@@ -979,8 +1059,8 @@ export class World {
     const water = new Mesh(
       new CircleGeometry(pond.radius, 32),
       new MeshStandardMaterial({
-        color: 0x5aafba,
-        roughness: 0.18,
+        color: 0x9fb4ac,
+        roughness: 0.32,
         metalness: 0.15,
         transparent: true,
         opacity: 0.86,
@@ -993,7 +1073,7 @@ export class World {
 
     const shoreline = new Mesh(
       new RingGeometry(pond.radius * 0.94, pond.radius * 1.16, 34),
-      new MeshStandardMaterial({ color: 0x7e785d, roughness: 1, flatShading: true }),
+      new MeshStandardMaterial({ color: 0xb0a58f, roughness: 1, flatShading: true }),
     );
     shoreline.rotation.x = -Math.PI / 2;
     shoreline.position.set(pond.x, 0.02, pond.z);
@@ -1001,7 +1081,7 @@ export class World {
 
     for (let i = 0; i < 13; i++) {
       const a = (i / 13) * Math.PI * 2 + 0.2;
-      const rock = this.prop('rock_a', 0.32 + this.random() * 0.32, () => makeRock(0.18 + this.random() * 0.24, 0x7a7d70), {
+      const rock = this.prop('rock_a', 0.32 + this.random() * 0.32, () => makeRock(0.18 + this.random() * 0.24, 0xa8a292), {
         maxWidth: 1.2,
         shadows: false,
       });
@@ -1018,7 +1098,7 @@ export class World {
     for (let i = 0; i < 2; i++) {
       const ring = new Mesh(
         new RingGeometry(0.35 + i * 0.35, 0.38 + i * 0.35, 26),
-        new MeshBasicMaterial({ color: 0xc7f0f2, transparent: true, opacity: 0.35, side: DoubleSide }),
+        new MeshBasicMaterial({ color: 0xe7efe8, transparent: true, opacity: 0.35, side: DoubleSide }),
       );
       ring.rotation.x = -Math.PI / 2;
       ring.position.set(pond.x, 0.05, pond.z);
@@ -1031,7 +1111,7 @@ export class World {
       const reed = this.prop(
         'grass_large',
         0.8 + this.random() * 0.55,
-        () => new Mesh(new ConeGeometry(0.035, 0.9 + this.random() * 0.7, 3), new MeshStandardMaterial({ color: 0x6c8e4e, roughness: 1 })),
+        () => new Mesh(new ConeGeometry(0.035, 0.9 + this.random() * 0.7, 3), new MeshStandardMaterial({ color: 0x8d9c7b, roughness: 1 })),
         { shadows: false },
       );
       reed.position.set(pond.x + Math.cos(a) * pond.radius * 1.12, 0.02, pond.z + Math.sin(a) * pond.radius * 1.12);
@@ -1056,6 +1136,7 @@ export class World {
       { x: d.statue.x, z: d.statue.z, r: 1.4 },
       { x: d.obelisk.x, z: d.obelisk.z, r: 1.3 },
       { x: d.campfire.x, z: d.campfire.z, r: 1.1 },
+      { x: 17.0, z: 1.6, r: 4.8 },
     ];
   }
 
@@ -1137,7 +1218,7 @@ export class World {
       if (this.blocked(x, z, 0.3)) continue;
       const rockKeys = ['rock_a', 'rock_c', 'rock_tall', 'rock_group', 'rock'] as const;
       const rock = this.prop(rockKeys[i % rockKeys.length], 0.45 + this.random() * 0.85, () =>
-        makeRock(0.25 + this.random() * 0.65, i % 4 === 0 ? 0x8e8d7e : 0x7d8071),
+        makeRock(0.25 + this.random() * 0.65, i % 4 === 0 ? 0xc0b9a9 : 0xaaa496),
       { maxWidth: 2.0, shadows: true });
       rock.position.set(x, 0, z);
       rock.rotation.y = this.random() * Math.PI * 2;
@@ -1151,7 +1232,7 @@ export class World {
       const grass = this.prop(
         i % 4 === 0 ? 'grass_large' : 'grass',
         0.26 + this.random() * 0.3,
-        () => makeGrassTuft(0.35 + this.random() * 0.4, i % 3 === 0 ? 0x88b366 : 0x709a52),
+        () => makeGrassTuft(0.35 + this.random() * 0.4, i % 3 === 0 ? 0xa9b591 : 0x8d9d7b),
         { shadows: false },
       );
       grass.position.set(x, 0, z);
@@ -1165,7 +1246,7 @@ export class World {
       const z = (this.random() * 2 - 1) * WORLD.island.rz * 0.88;
       if (this.blocked(x, z, 0.1)) continue;
       const flower = this.prop(flowerKeys[i % flowerKeys.length], 0.32 + this.random() * 0.24, () =>
-        makeFlower(0.55 + this.random() * 0.45, [0xe8c45c, 0xb9a5ff, 0xef8056][i % 3]),
+        makeFlower(0.55 + this.random() * 0.45, [0xf2efe6, 0xe4ddd0, 0xcbb283][i % 3]),
       { shadows: false });
       flower.position.set(x, 0, z);
       flower.rotation.y = this.random() * Math.PI;
@@ -1213,7 +1294,7 @@ export class World {
       const z = (this.random() * 2 - 1) * WORLD.island.rz * 0.78;
       if (this.blocked(x, z, 0.5)) continue;
       const bushKeys = ['bush', 'bush_berries', 'plant_bush', 'plant_bush_detailed'] as const;
-      const bush = this.prop(bushKeys[i % bushKeys.length], 0.9 + this.random() * 0.5, () => makeRock(0.4, 0x6f9a4e), {
+      const bush = this.prop(bushKeys[i % bushKeys.length], 0.9 + this.random() * 0.5, () => makeRock(0.4, 0x9aa985), {
         maxWidth: 1.8,
       });
       bush.position.set(x, 0, z);
@@ -1229,7 +1310,7 @@ export class World {
 
     // A patch of tiny wildflowers by the farmhouse.
     for (let i = 0; i < 6; i++) {
-      const tuft = this.prop('flowers_yellow', 0.28, () => makeFlower(0.45, 0xe8c45c), { shadows: false });
+      const tuft = this.prop('flowers_yellow', 0.28, () => makeFlower(0.45, 0xe4ddd0), { shadows: false });
       tuft.position.set(WORLD.decorations.farmhouse.x + 1.2 + i * 0.35, 0, WORLD.decorations.farmhouse.z + 3.1);
       tuft.rotation.y = this.random() * Math.PI;
       this.staticParts.add(tuft);
@@ -1249,7 +1330,7 @@ export class World {
     const geo = new BufferGeometry();
     geo.setAttribute('position', new BufferAttribute(positions, 3));
     const material = new PointsMaterial({
-      color: 0xffe08a,
+      color: 0xf0d9a0,
       size: 0.06,
       map: softDotTexture(),
       transparent: true,
@@ -1275,7 +1356,7 @@ export class World {
     this.pollen = new Points(
       pollenGeo,
       new PointsMaterial({
-        color: 0xf7e7b0,
+        color: 0xf6ead0,
         size: 0.035,
         map: softDotTexture(),
         transparent: true,
@@ -1513,7 +1594,7 @@ export class World {
   }
 
   syncPlotVisual(plot: PlotRuntime, view: PlotVisual) {
-    const wild = plot.state === 'wild';
+    const wild = plot.state === 'wild' || (plot.state === 'guardian' && plot.underlying === 'wild');
     view.wild.visible = wild;
     view.farm.visible = !wild;
     view.towerBase.visible = plot.state === 'tower';

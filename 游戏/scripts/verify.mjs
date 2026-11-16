@@ -155,10 +155,14 @@ try {
   const assetReport = await page.evaluate(() => window.__harvestAssets ?? null);
   results.assets = assetReport;
   check(
-    'all external models load from static assets',
-    !!assetReport && assetReport.loaded === assetReport.total && assetReport.errors.length === 0,
-    assetReport ? `${assetReport.loaded}/${assetReport.total} loaded, ${assetReport.errors.length} errors` : 'no asset report',
+    'the build is a dependency-free white-box art build',
+    !!assetReport && assetReport.mode === 'whitebox' && assetReport.loaded === 0 && assetReport.errors.length === 0,
+    assetReport ? `${assetReport.mode} mode, ${assetReport.errors.length} errors` : 'no asset report',
   );
+  const glbRequests = await page.evaluate(() =>
+    performance.getEntriesByType('resource').map((entry) => entry.name).filter((name) => /\.glb(\?|$)/i.test(name)),
+  );
+  check('no external GLB is requested at runtime', glbRequests.length === 0, `${glbRequests.length} GLB requests`);
   check('start screen and live 3D scene render', await page.locator('#menu-screen').isVisible(), 'menu visible');
   check('HUD is hidden until the run starts', await page.locator('#hud').isHidden(), 'HUD hidden on menu');
   const startButtonStyle = await page.locator('#btn-start').evaluate((element) => {
@@ -167,7 +171,7 @@ try {
   });
   check(
     'start button keeps a visible gold background',
-    startButtonStyle.backgroundColor === 'rgb(243, 196, 85)' && startButtonStyle.backgroundImage.includes('linear-gradient'),
+    startButtonStyle.backgroundColor === 'rgb(217, 185, 120)' && startButtonStyle.backgroundImage.includes('linear-gradient'),
     JSON.stringify(startButtonStyle),
   );
 
@@ -376,6 +380,159 @@ try {
   await page.waitForTimeout(200);
   starState = await getState(page);
   check('selling the star tower clears its plot', !starState.towers.some((tower) => tower.plot === 19) && starState.plots[19].state === 'wild', `plots ${starState.plots[19].state}`);
+
+  /* ── 6b. Recruit, place, merge and aura ───────────────────────────── */
+  await page.evaluate(() => {
+    window.__fieldguard.addGold(700);
+    window.__fieldguard.addStar(4);
+  });
+  const beforeRecruit = await getState(page);
+  await page.locator('#btn-recruit').click();
+  await page.waitForTimeout(250);
+  let recruitState = await getState(page);
+  const firstCost = beforeRecruit.recruits.cost;
+  const drawIds = recruitState.recruits.bench.map((card) => card.id);
+  const duplicateMax = Math.max(...drawIds.map((id) => drawIds.filter((entry) => entry === id).length));
+  check(
+    'recruit spends gold and draws a random three-card bench',
+    recruitState.recruits.bench.length === 3 &&
+      recruitState.gold === beforeRecruit.gold - firstCost &&
+      recruitState.recruits.draws === 1 &&
+      duplicateMax <= 2 &&
+      drawIds.every((id) => ['bowman', 'hoeman', 'herbalist', 'fieldhand', 'mason', 'ricespirit'].includes(id)),
+    `${drawIds.join(', ')} · gold ${beforeRecruit.gold} → ${recruitState.gold} · cost ${firstCost}`,
+  );
+  check(
+    'the recruit bar shows three cards and the next batch costs more',
+    (await page.locator('.recruit-card').count()) === 3 &&
+      (await page.locator('#btn-recruit').isDisabled()) &&
+      /招募/.test((await page.locator('#btn-recruit').textContent()) ?? '') &&
+      recruitState.recruits.cost === Math.min(44, firstCost + 4),
+    await page.locator('#btn-recruit').textContent(),
+  );
+
+  await page.locator('.recruit-card').nth(1).click();
+  await page.waitForTimeout(120);
+  await facePlot(page, 20);
+  await pressE(page);
+  recruitState = await getState(page);
+  const placedRecruit = recruitState.guardians.find((guardian) => guardian.plot === 20);
+  check(
+    'a selected recruit is placed on the chosen empty plot and occupies it',
+    !!placedRecruit &&
+      recruitState.plots[20].state === 'guardian' &&
+      recruitState.plots[20].underlying === 'wild' &&
+      recruitState.recruits.bench.length === 2 &&
+      recruitState.stats.guardsPlaced === 1,
+    JSON.stringify({ guardian: placedRecruit, plot: recruitState.plots[20], bench: recruitState.recruits.bench.length }),
+  );
+  const guardPlant = await page.evaluate(() => window.__fieldguard.plant(20, 'wheat'));
+  check('a guard post cannot be planted with crops', guardPlant === false, `plant returned ${guardPlant}`);
+  const guardPrompt = await page.locator('#interact-title').textContent();
+  check('a placed guardian can be inspected from its plot', /查看/.test(guardPrompt ?? ''), `prompt “${guardPrompt}”`);
+
+  // Deterministic cards for the merge test; normal play still uses the random draw.
+  const masonCards = await page.evaluate(() => window.__fieldguard.addGuardianCard('mason', 2));
+  const masonUids = masonCards.slice(-2).map((card) => card.uid);
+  await page.evaluate(({ uids }) => {
+    window.__fieldguard.placeGuardian(6, uids[0]);
+    window.__fieldguard.placeGuardian(7, uids[1]);
+    window.__fieldguard.selectGuardianAt(6);
+  }, { uids: masonUids });
+  await page.waitForTimeout(200);
+  check(
+    'two adjacent same-type guards expose a merge action',
+    (await page.locator('#inspector').isVisible()) &&
+      !(await page.locator('#btn-merge').isDisabled()) &&
+      /合成 Lv\.2/.test((await page.locator('#btn-merge').textContent()) ?? ''),
+    await page.locator('#btn-merge').textContent(),
+  );
+  await page.locator('#btn-merge').click();
+  await page.waitForTimeout(200);
+  recruitState = await getState(page);
+  const mergedGuard = recruitState.guardians.find((guardian) => guardian.plot === 6);
+  check(
+    'merging consumes the adjacent guard and raises the survivor to Lv.2',
+    mergedGuard?.level === 2 &&
+      recruitState.plots[7].state === 'wild' &&
+      recruitState.guardians.filter((guardian) => guardian.id === 'mason').length === 1,
+    JSON.stringify({ mergedGuard, plot7: recruitState.plots[7].state }),
+  );
+  await page.locator('#btn-sell').click();
+  await page.waitForTimeout(200);
+  recruitState = await getState(page);
+  check(
+    'dismissing a guard restores its plot without a gold refund',
+    !recruitState.guardians.some((guardian) => guardian.plot === 6) && recruitState.plots[6].state === 'wild',
+    `plot 6 ${recruitState.plots[6].state}`,
+  );
+
+  // Field-hand aura: a crop next to it grows measurably faster than a far crop.
+  await page.evaluate(() => {
+    const api = window.__fieldguard;
+    api.reclaim(10);
+    api.simulate(1.7);
+    api.reclaim(8);
+    api.simulate(1.7);
+    api.plant(10, 'wheat');
+    api.plant(8, 'wheat');
+    const cards = api.addGuardianCard('fieldhand', 1);
+    api.placeGuardian(11, cards[cards.length - 1].uid);
+    api.simulate(4.5);
+  });
+  recruitState = await getState(page);
+  const nearProgress = recruitState.plots[10].crop?.progress ?? 0;
+  const farProgress = recruitState.plots[8].crop?.progress ?? 0;
+  check(
+    'a field-hand’s adjacency aura speeds up the neighbouring crop',
+    nearProgress > 0 && farProgress > 0 && nearProgress / farProgress > 1.08,
+    `near ${Math.round(nearProgress * 100)}% vs far ${Math.round(farProgress * 100)}%`,
+  );
+  check(
+    'the guard aura is reported in the debug state',
+    (recruitState.guardians.find((guardian) => guardian.plot === 11)?.auraBonus ?? '').includes('农田生长'),
+    recruitState.guardians.find((guardian) => guardian.plot === 11)?.auraBonus,
+  );
+
+  // Three bowmen along the north path actually fight the first wave.
+  await page.evaluate(() => {
+    const api = window.__fieldguard;
+    const cards = api.addGuardianCard('bowman', 3);
+    const uids = cards.slice(-3).map((card) => card.uid);
+    api.placeGuardian(0, uids[0]);
+    api.placeGuardian(1, uids[1]);
+    api.placeGuardian(2, uids[2]);
+    api.nextWave();
+    api.simulate(45);
+  });
+  recruitState = await getState(page);
+  check(
+    'recruited guards deal damage in a live wave',
+    recruitState.stats.kills > 0,
+    `${recruitState.stats.kills} kills, wave ${recruitState.wave}`,
+  );
+
+  // Clear the bench, then check actual recruit cost escalation.
+  await page.evaluate(() => {
+    const api = window.__fieldguard;
+    for (const card of api.getState().recruits.bench) api.dismissBench(card.uid);
+    api.recruit();
+  });
+  recruitState = await getState(page);
+  check(
+    'each recruit batch raises the next cost',
+    recruitState.recruits.cost === Math.min(44, firstCost + 8) && recruitState.recruits.draws === 2,
+    `draws ${recruitState.recruits.draws}, next cost ${recruitState.recruits.cost}`,
+  );
+  const benchBeforeDismiss = recruitState.recruits.bench.length;
+  await page.locator('.recruit-dismiss').first().click();
+  await page.waitForTimeout(150);
+  recruitState = await getState(page);
+  check(
+    'an unplaced recruit can be dismissed for free',
+    recruitState.recruits.bench.length === benchBeforeDismiss - 1,
+    `bench ${benchBeforeDismiss} → ${recruitState.recruits.bench.length}`,
+  );
 
   /* ── 7. Pause and help overlays ───────────────────────────────────── */
   await page.locator('#btn-pause').click();
@@ -884,6 +1041,8 @@ try {
       joystick: box('#joystick'),
       interact: box('#btn-interact'),
       touchVisible: !document.getElementById('touch-controls').hidden,
+      recruitVisible: !document.getElementById('recruit-bar').hidden,
+      recruit: box('#recruit-bar'),
       hudOverlap: !!chips && !!right && chips.right > right.x,
     };
   });
@@ -892,6 +1051,9 @@ try {
     mobileLayout.documentWidth <= mobileLayout.viewportWidth + 1 &&
       mobileLayout.utilityVisible &&
       mobileLayout.touchVisible &&
+      mobileLayout.recruitVisible &&
+      mobileLayout.recruit &&
+      mobileLayout.recruit.right <= mobileLayout.viewportWidth + 1 &&
       !mobileLayout.hudOverlap &&
       mobileLayout.joystick.w > 0 &&
       mobileLayout.interact.w > 0 &&
@@ -981,6 +1143,48 @@ try {
   await mobileDuel.screenshot({ path: path.join(root, 'docs/screenshots/after-mobile-versus.png') });
   recordScreenshot('docs/screenshots/after-mobile-versus.png');
   await mobileDuelContext.close();
+
+  /* ── 12c. White-box gallery and prompt manifest ──────────────────── */
+  const galleryPage = await browser.newPage({ viewport: { width: 1600, height: 1200 } });
+  wirePage(galleryPage);
+  await galleryPage.goto(`${baseUrl}/?gallery=1`, { waitUntil: 'networkidle' });
+  await galleryPage.waitForFunction(() => window.__whiteboxGallery?.ready === true, null, { timeout: 30000 });
+  await galleryPage.waitForTimeout(600);
+  const galleryState = await galleryPage.evaluate(() => ({
+    count: window.__whiteboxGallery.count,
+    missing: window.__whiteboxGallery.missing,
+    ids: window.__whiteboxGallery.ids,
+  }));
+  check(
+    'the white-box gallery renders every documented placeholder',
+    galleryState.count === 36 && galleryState.missing.length === 0 && new Set(galleryState.ids).size === 36,
+    `${galleryState.count} rendered, ${galleryState.missing.length} missing`,
+  );
+  const galleryShot = path.join(root, 'docs/screenshots/whitebox-overview.png');
+  await galleryPage.screenshot({ path: galleryShot });
+  recordScreenshot(path.relative(root, galleryShot));
+  await galleryPage.close();
+
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'src/game/whitebox-assets.json'), 'utf8'));
+  const promptDoc = fs.readFileSync(path.join(root, 'docs/whitebox-blender-prompts.md'), 'utf8');
+  const missingDocEntries = manifest.items.filter((item) => !promptDoc.includes(`### ${item.name} · \`${item.id}\``));
+  check(
+    'every white-box item has a size/orientation/triangle/GLB prompt entry',
+    manifest.items.length === 36 &&
+      missingDocEntries.length === 0 &&
+      manifest.items.every(
+        (item) =>
+          promptDoc.includes(item.id) &&
+          promptDoc.includes(`≤ ${item.triangles} 三角面`) &&
+          promptDoc.includes('GLB'),
+      ),
+    `${manifest.items.length} manifest items, ${missingDocEntries.length} missing doc sections`,
+  );
+  check(
+    'the prompt document is generated from the same manifest as the models',
+    promptDoc.includes('自动生成自') && promptDoc.includes('whitebox-assets.json'),
+    'generated header present',
+  );
 
   /* ── 13. Licence evidence ─────────────────────────────────────────── */
   const kenneyLicense = fs.readFileSync(path.join(root, 'public/assets/kenney/License.txt'), 'utf8');

@@ -92,14 +92,14 @@ python3 -m http.server 8000 --directory _site
 
 ## 游戏
 
-《穗守 · Harvest & Hold》是一款单机 3D「第一人称种田 × 塔防」网页游戏：走进浮空山田，把荒地逐块开垦成农田，种下作物、用金币筑塔、用星辉强化防御，守住野兽的进攻。塔可以建在你选中的任意地块上，占用一块地就少一块田。v2「对垒季」新增 8 波对垒、第 1–7 波后三选一季令、行商、相邻同阶塔合成与异步 AI 对手。纯静态、无后端，桌面与手机浏览器都能玩。
+《穗守 · Harvest & Hold》是一款单机 3D「第一人称种田 × 塔防」网页游戏：走进浮空山田，把荒地逐块开垦成农田，种下作物、用金币筑塔、用星辉强化防御，守住野兽的进攻。塔可以建在你选中的任意地块上，占用一块地就少一块田。v3「中国田园白模季」把美术改成青瓦白墙、梯田稻浪、竹篱与稻穗素模，并加入《赵云与阿斗》式的随机招募乡勇、选地放置与相邻合成；v2「对垒季」的 8 波对垒、季令三选一、行商、合成与异步 AI 对手全部保留。纯静态、无后端，桌面与手机浏览器都能玩。
 
 作品同时保留改造前的**经典版**（俯视视角、12 块固定农田、7 个固定塔位），完整代码与验收文档在 [`游戏经典版/`](游戏经典版/)，玩法不再更新，但会随站点一起构建发布。
 
-玩法、操作、内容清单、完整验收结果和素材许可证见 **[`游戏/README.md`](游戏/README.md)**；经典版说明见 **[`游戏经典版/README.md`](游戏经典版/README.md)**；《赵云与阿斗》调研与整套玩法设计见 **[`游戏/docs/research-zhaoyun-adou.md`](游戏/docs/research-zhaoyun-adou.md)** 与 **[`游戏/docs/design-v2.md`](游戏/docs/design-v2.md)**。
+玩法、操作、内容清单、完整验收结果和素材许可证见 **[`游戏/README.md`](游戏/README.md)**；经典版说明见 **[`游戏经典版/README.md`](游戏经典版/README.md)**；《赵云与阿斗》调研、v2 对垒季与 v3 中国田园白模/招募设计见 **[`游戏/docs/research-zhaoyun-adou.md`](游戏/docs/research-zhaoyun-adou.md)**、**[`游戏/docs/design-v2.md`](游戏/docs/design-v2.md)** 与 **[`游戏/docs/design-v3-pastoral.md`](游戏/docs/design-v3-pastoral.md)**；36 件白模的 Blender MCP 提示词见 **[`游戏/docs/whitebox-blender-prompts.md`](游戏/docs/whitebox-blender-prompts.md)**。
 
 ## 素材与许可
 
 - 网站的人物姓名、简介仍为占位内容，上线前请替换；联系邮箱已填为 `kkbbot@163.com`。
-- 两个版本的游戏使用的外部 3D 美术资源均为 **CC0**，逐项来源与许可证证据见 [`游戏/CREDITS.md`](游戏/CREDITS.md) 与 [`游戏经典版/CREDITS.md`](游戏经典版/CREDITS.md)。
+- 两个版本的历史外部 3D 美术资源均为 **CC0**，逐项来源与许可证证据见 [`游戏/CREDITS.md`](游戏/CREDITS.md) 与 [`游戏经典版/CREDITS.md`](游戏经典版/CREDITS.md)；v3 第一人称版运行时不加载外部 GLB，全部为程序化中国田园白模。
 - 游戏代码本身未附带额外开源许可证。

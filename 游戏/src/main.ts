@@ -1,7 +1,7 @@
 import './style.css';
 import { Game } from './game/game';
-import { AssetArt, AssetLibrary, EnvironmentAssets } from './game/assets';
 import { ProceduralArt } from './game/models';
+import { startWhiteboxGallery } from './gallery';
 
 const canvasElement = document.getElementById('scene');
 if (!(canvasElement instanceof HTMLCanvasElement)) {
@@ -18,34 +18,26 @@ function setLoading(fraction: number, label: string) {
 }
 
 async function boot() {
-  const library = new AssetLibrary();
-  try {
-    await library.loadAll(setLoading);
-  } catch (error) {
-    console.warn('Asset loading failed; procedural art will be used.', error);
-  }
-  if (library.errors.length > 0) {
-    console.warn(`[assets] ${library.errors.length} file(s) could not be loaded`, library.errors);
-  }
-  const useAssets = library.size > 0;
-  const art = useAssets ? new AssetArt(library) : new ProceduralArt();
-  let environment: EnvironmentAssets | null = null;
-  try {
-    environment = useAssets ? new EnvironmentAssets(library) : null;
-  } catch (error) {
-    console.warn('Environment asset preparation failed; procedural props will be used.', error);
-  }
+  // v3 is a deliberately dependency-free white-box build: no external model
+  // requests, no licence ambiguity, no loading failure path. Generated GLBs can
+  // replace the placeholders later using the ids in the white-box prompt doc.
+  setLoading(0.35, '搭起青瓦白墙的素模…');
+  await new Promise((resolve) => window.setTimeout(resolve, 120));
+  setLoading(0.8, '铺开梯田与竹篱…');
+  await new Promise((resolve) => window.setTimeout(resolve, 120));
+  const art = new ProceduralArt();
   (window as unknown as { __harvestAssets?: unknown }).__harvestAssets = {
-    loaded: library.size,
-    total: library.total,
-    errors: [...library.errors],
+    mode: 'whitebox',
+    loaded: 0,
+    total: 0,
+    errors: [],
   };
-  if (useAssets && library.errors.length > 0 && loadingNote) {
-    loadingNote.textContent = '部分素材加载失败，已启用程序化兜底';
-  } else if (!useAssets && loadingNote) {
-    loadingNote.textContent = '离线素材不可用，使用程序化低多边形美术';
+  if (new URLSearchParams(window.location.search).has('gallery')) {
+    startWhiteboxGallery(canvas);
+    return;
   }
-  new Game(canvas, art, environment);
+  setLoading(1, '准备就绪');
+  new Game(canvas, art, null);
 }
 
 boot().catch((error) => {

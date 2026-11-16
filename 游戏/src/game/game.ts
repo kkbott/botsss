@@ -17,7 +17,9 @@ import {
   BLESSINGS,
   CROPS,
   ENEMIES,
+  GUARDIANS,
   PLOTS,
+  RECRUIT_RULES,
   RULES,
   SHOP_ITEMS,
   STORAGE_KEY,
@@ -37,6 +39,9 @@ import type {
   EnemyRuntime,
   GamePhase,
   GameStats,
+  GuardianDraftCard,
+  GuardianId,
+  GuardianRuntime,
   PlotRuntime,
   RivalState,
   RunMode,
@@ -177,6 +182,9 @@ export class Game {
   private waveRewardMul = 1;
   private spawnSchedule: Array<{ enemy: EnemyId; at: number }> = [];
   private spawnIndex = 0;
+  private recruitDraws = 0;
+  private bench: GuardianDraftCard[] = [];
+  private nextGuardianUid = 1;
   private blessingStacks: Partial<Record<BlessingId, number>> = {};
   private blessingOffers: BlessingChoice[] = [];
   private blessingPicks = 0;
@@ -193,8 +201,10 @@ export class Game {
   private enemies: EnemyRuntime[] = [];
   private projectiles: Projectile[] = [];
   private beams: Beam[] = [];
-  private selectedTool: { kind: 'crop' | 'tower'; id: CropId | TowerId } | null = null;
+  private selectedTool: { kind: 'crop' | 'tower' | 'guardian'; id: CropId | TowerId | GuardianId; uid?: number } | null = null;
   private selectedTower: TowerRuntime | null = null;
+  private selectedGuardian: GuardianRuntime | null = null;
+  private guardians: GuardianRuntime[] = [];
   private activeReclaim: PlotRuntime | null = null;
   private targetPlot: PlotRuntime | null = null;
   private hoveredPlot: PlotRuntime | null = null;
@@ -220,6 +230,8 @@ export class Game {
     reclaimed: 0,
     merges: 0,
     blessings: 0,
+    recruits: 0,
+    guardsPlaced: 0,
   };
 
   private save: CachedSave;
@@ -318,6 +330,9 @@ export class Game {
       mergeTower: () => this.mergeSelectedTower(),
       sellTower: () => this.sellSelectedTower(),
       closeInspector: () => this.clearTowerSelection(),
+      recruit: () => this.recruit(),
+      selectGuardian: (uid) => this.selectGuardianTool(uid),
+      dismissBench: (uid) => this.dismissBenchCard(uid),
       chooseBlessing: (id) => this.chooseBlessing(id as BlessingId),
       buyShopItem: (id) => this.buyShopItem(id as ShopItemId),
       rerollShop: () => this.rerollShop(),
@@ -339,6 +354,16 @@ export class Game {
       if (distance < min && distance > 0.0001) {
         px = tower.plot.x + (dx / distance) * min;
         pz = tower.plot.z + (dz / distance) * min;
+      }
+    }
+    for (const guardian of this.guardians) {
+      const dx = px - guardian.plot.x;
+      const dz = pz - guardian.plot.z;
+      const distance = Math.hypot(dx, dz);
+      const min = 1.55 + WORLD.player.radius;
+      if (distance < min && distance > 0.0001) {
+        px = guardian.plot.x + (dx / distance) * min;
+        pz = guardian.plot.z + (dz / distance) * min;
       }
     }
     return { x: px, z: pz };
@@ -371,11 +396,16 @@ export class Game {
     this.spawnIndex = 0;
     this.selectedTool = null;
     this.selectedTower = null;
+    this.selectedGuardian = null;
     this.targetPlot = null;
     this.hoveredPlot = null;
     this.accumulator = 0;
     this.runTime = 0;
     this.helpPausedRun = false;
+    this.recruitDraws = 0;
+    this.bench = [];
+    this.nextGuardianUid = 1;
+    this.guardians = [];
     this.blessingStacks = {};
     this.blessingOffers = [];
     this.blessingPicks = 0;
@@ -397,6 +427,8 @@ export class Game {
       reclaimed: 0,
       merges: 0,
       blessings: 0,
+      recruits: 0,
+      guardsPlaced: 0,
     };
     this.ui.hideMenu();
     this.ui.hideIntermission();
@@ -409,6 +441,7 @@ export class Game {
     this.ui.hideTooltip();
     this.ui.setRival(this.rival, this.lives);
     this.ui.setBlessings([]);
+    this.ui.setRecruitState({ cost: this.recruitCost(), gold: this.gold, bench: this.bench, selected: null });
     this.world.setMenuMode(false);
     this.world.setCameraMode('first');
     this.player.reset();
@@ -428,7 +461,7 @@ export class Game {
     } else {
       this.ui.showBanner(
         '第 1 波准备',
-        '先把荒地变成麦田',
+        '先把荒地变成水田',
         '走到地块旁按 E 开垦，再播种。金币来自收获，塔要建在能照看石径的地块上。',
         false,
         4200,
@@ -464,6 +497,7 @@ export class Game {
       this.ui.setInteractPrompt(null);
       this.ui.setTouchControlsVisible(false);
       this.selectedTool = null;
+      this.refreshRecruitUi();
       this.hoveredPlot = null;
       this.previewRange.visible = false;
       this.clearHighlights();
@@ -530,6 +564,7 @@ export class Game {
     this.ui.setInteractPrompt(null);
     this.ui.setTouchControlsVisible(false);
     this.ui.setCrosshair(false);
+    this.ui.hideRecruitBar();
     this.ui.hideIntermission();
     this.previewRange.visible = false;
     this.clearHighlights();
@@ -569,6 +604,8 @@ export class Game {
       maxLives: this.maxLives,
       blessings: this.stats.blessings,
       merges: this.stats.merges,
+      recruits: this.stats.recruits,
+      guardsPlaced: this.stats.guardsPlaced,
       rivalName: this.rival?.name,
       rivalLives: this.rival?.lives ?? 0,
     });
@@ -867,7 +904,7 @@ export class Game {
     this.updateInteractionPrompt();
     this.ui.showBanner(
       `第 ${this.wave + 1} 波准备`,
-      this.wave === 0 ? '先把荒地变成麦田' : '下一波正在集结',
+      this.wave === 0 ? '先把荒地变成水田' : '下一波正在集结',
       this.runMode === 'versus' ? '补种、修塔、开垦；对垒还在继续。' : '走到地块旁按 E 开垦、播种或建塔。',
       false,
       2500,
@@ -919,9 +956,10 @@ export class Game {
 
   private refreshTowerBuffs() {
     for (const tower of this.towers) {
-      tower.rangeRing.scale.setScalar(tower.range * this.towerRangeMul());
+      tower.rangeRing.scale.setScalar(tower.range * this.towerRangeAt(this.plots[tower.plot.index]));
     }
     if (this.selectedTower) this.showTowerInspector(this.selectedTower);
+    if (this.selectedGuardian) this.showGuardianInspector(this.selectedGuardian);
   }
 
   private findMergePartner(tower: TowerRuntime): TowerRuntime | null {
@@ -954,7 +992,7 @@ export class Game {
     tower.slowDuration = stats.slowDuration;
     tower.fireCooldown = stats.cooldown;
     tower.cooldown = Math.min(tower.cooldown, stats.cooldown * this.towerCooldownMul());
-    tower.rangeRing.scale.setScalar(tower.range * this.towerRangeMul());
+    tower.rangeRing.scale.setScalar(tower.range * this.towerRangeAt(this.plots[tower.plot.index]));
   }
 
   private mergeTower(tower: TowerRuntime) {
@@ -997,6 +1035,7 @@ export class Game {
 
   private mergeSelectedTower() {
     if (this.selectedTower) this.mergeTower(this.selectedTower);
+    else if (this.selectedGuardian) this.mergeGuardian(this.selectedGuardian);
   }
 
   private toggleSpeed() {
@@ -1343,7 +1382,7 @@ export class Game {
       if (!plot.crop) continue;
       const def = CROPS[plot.crop.type];
       if (!plot.crop.mature) {
-        plot.crop.elapsed += dt / this.cropGrowMul();
+        plot.crop.elapsed += (dt / this.cropGrowMul()) * (1 + this.auraBonus(plot, 'farmGrowth'));
         const progress = Math.min(1, plot.crop.elapsed / def.growTime);
         const nextStage: CropStage = progress >= 1 ? 3 : progress < 0.34 ? 0 : progress < 0.67 ? 1 : 2;
         const becameMature = nextStage === 3;
@@ -1403,6 +1442,10 @@ export class Game {
       if (existing) this.selectTowerObject(existing);
       return false;
     }
+    if (plot.state === 'guardian') {
+      this.nudgeError('这块地已经安置了乡勇：先劝返或换一块地');
+      return false;
+    }
     if (plot.scorched) {
       this.nudgeError('焦土上不能建塔：先按 E 修复');
       return false;
@@ -1431,7 +1474,7 @@ export class Game {
     view.group.add(art.group);
     const rangeRing = this.makeRangeRing(def.accent, 0.42);
     rangeRing.position.set(plot.spec.x, 0.36, plot.spec.z);
-    rangeRing.scale.setScalar(levelDef.range);
+    rangeRing.scale.setScalar(levelDef.range * this.towerRangeAt(plot));
     this.world.scene.add(rangeRing);
     const tower: TowerRuntime = {
       id: type,
@@ -1530,10 +1573,12 @@ export class Game {
 
   private sellSelectedTower() {
     if (this.selectedTower) this.sellTower(this.selectedTower);
+    else if (this.selectedGuardian) this.dismissGuardian(this.selectedGuardian);
   }
 
   private selectTowerObject(tower: TowerRuntime) {
     if (this.selectedTower && this.selectedTower !== tower) this.selectedTower.rangeRing.visible = false;
+    this.selectedGuardian = null;
     this.selectedTower = tower;
     tower.rangeRing.visible = true;
     this.selectedTool = null;
@@ -1546,18 +1591,22 @@ export class Game {
   private clearTowerSelection() {
     if (this.selectedTower) this.selectedTower.rangeRing.visible = false;
     this.selectedTower = null;
+    this.selectedGuardian = null;
     this.ui.hideInspector();
   }
 
   private showTowerInspector(tower: TowerRuntime) {
     const def = TOWERS[tower.id];
     const level = def.levels[tower.level - 1];
+    const plot = this.plots[tower.plot.index];
+    const damage = level.damage * this.towerDamageAt(plot);
+    const range = level.range * this.towerRangeAt(plot);
     const stats: InspectorData['stats'] = [
       { label: '等级', value: `Lv.${tower.level}` },
-      { label: '伤害', value: String(level.damage) },
-      { label: '射程', value: (level.range * this.towerRangeMul()).toFixed(1) },
+      { label: '伤害', value: damage.toFixed(0) },
+      { label: '射程', value: range.toFixed(1) },
       { label: '攻击间隔', value: `${(level.cooldown * this.towerCooldownMul()).toFixed(2)}s` },
-      { label: '每秒伤害', value: (level.damage / (level.cooldown * this.towerCooldownMul())).toFixed(1) },
+      { label: '每秒伤害', value: (damage / (level.cooldown * this.towerCooldownMul())).toFixed(1) },
     ];
     if (tower.id === 'cannon') stats.push({ label: '爆炸半径', value: level.splash.toFixed(1) });
     if (tower.id === 'star') stats.push({ label: '减速', value: `${Math.round(level.slow * 100)}% / ${level.slowDuration}s` });
@@ -1584,10 +1633,14 @@ export class Game {
     const mergeHint = partner
       ? `可与相邻的${TOWERS[partner.id].name}（Lv.${partner.level}）合成：消耗它，本塔免费升到 Lv.${tower.level + 1}。`
       : '在相邻地块再建一座同类型、同等级的塔，即可免费合成升阶。';
+    const auraParts: string[] = [];
+    if (this.auraBonus(plot, 'towerDamage') > 0) auraParts.push(`伤害 +${Math.round(this.auraBonus(plot, 'towerDamage') * 100)}%`);
+    if (this.auraBonus(plot, 'towerRange') > 0) auraParts.push(`射程 +${Math.round(this.auraBonus(plot, 'towerRange') * 100)}%`);
+    const auraNote = auraParts.length > 0 ? ` 乡勇光环：${auraParts.join('、')}。` : '';
     const note =
       tower.level >= 3
-        ? `这座塔已经抵达最高等级。拆除后这块地会恢复为${this.plots[tower.plot.index]?.underlying === 'farmland' ? '农田' : '荒地'}。`
-        : `${mergeHint}${upgradeEnabled ? '' : ` 直接升级需要 ${nextGold} 金币${nextStar ? ` 和 ${nextStar} 星辉` : ''}。`}`;
+        ? `这座塔已经抵达最高等级。拆除后这块地会恢复为${this.plots[tower.plot.index]?.underlying === 'farmland' ? '农田' : '荒地'}。${auraNote}`
+        : `${mergeHint}${upgradeEnabled ? '' : ` 直接升级需要 ${nextGold} 金币${nextStar ? ` 和 ${nextStar} 星辉` : ''}。`}${auraNote}`;
     this.ui.showInspector({
       icon: def.icon,
       name: def.name,
@@ -1601,6 +1654,388 @@ export class Game {
       sellLabel: `拆除 +${refund} 金币`,
       sellEnabled: this.phase === 'playing',
     });
+  }
+
+  /* ───────────────────────────── recruits / guardians ───────────────────────────── */
+
+  private recruitCost() {
+    return Math.min(RECRUIT_RULES.maxCost, RECRUIT_RULES.baseCost + this.recruitDraws * RECRUIT_RULES.costStep);
+  }
+
+  private drawGuardianId(existing: GuardianId[]): GuardianId {
+    const all = Object.keys(GUARDIANS) as GuardianId[];
+    const allowed = all.filter((id) => existing.filter((entry) => entry === id).length < RECRUIT_RULES.duplicateLimit);
+    const pool = allowed.length > 0 ? allowed : all;
+    let total = 0;
+    for (const id of pool) total += RECRUIT_RULES.weights[id];
+    let roll = Math.random() * total;
+    for (const id of pool) {
+      roll -= RECRUIT_RULES.weights[id];
+      if (roll <= 0) return id;
+    }
+    return pool[pool.length - 1];
+  }
+
+  private selectedBenchUid() {
+    return this.selectedTool?.kind === 'guardian' ? this.selectedTool.uid ?? null : null;
+  }
+
+  private refreshRecruitUi() {
+    this.ui.setRecruitState({
+      cost: this.recruitCost(),
+      gold: this.gold,
+      bench: this.bench.map((card) => ({ ...card })),
+      selected: this.selectedBenchUid(),
+    });
+  }
+
+  private recruit() {
+    if (this.phase !== 'playing') return;
+    if (this.bench.length > 0) {
+      this.nudgeError('待命席上还有乡勇：先安置或劝返，再重新招募');
+      return;
+    }
+    const cost = this.recruitCost();
+    if (this.gold < cost) {
+      this.nudgeError(`金币不足：这次招募需要 ${cost} 金币`);
+      return;
+    }
+    this.gold -= cost;
+    this.recruitDraws += 1;
+    this.stats.recruits += 1;
+    const ids: GuardianId[] = [];
+    for (let i = 0; i < RECRUIT_RULES.drawSize; i++) ids.push(this.drawGuardianId(ids));
+    this.bench = ids.map((id) => ({ uid: this.nextGuardianUid++, id }));
+    const first = this.bench[0];
+    this.selectedTool = { kind: 'guardian', id: first.id, uid: first.uid };
+    this.clearTowerSelection();
+    this.ui.setSelectedTool('guardian', first.id);
+    this.ui.toast(`乡约亭招募：${ids.map((id) => GUARDIANS[id].name).join(' / ')}`, 'gold');
+    this.particles.spawn(new Vector3(this.player.position.x, 1.1, this.player.position.z), 0xe6d6a4, 16, {
+      speed: 2.2,
+      life: 0.8,
+      size: 0.1,
+      gravity: 2.4,
+      up: 2.2,
+    });
+    this.audio.play('build');
+    this.refreshRecruitUi();
+    this.updateHudNow();
+    this.updateInteractionPrompt();
+  }
+
+  private selectGuardianTool(uid: number) {
+    if (this.phase !== 'playing') return;
+    const card = this.bench.find((entry) => entry.uid === uid);
+    if (!card) return;
+    if (this.selectedTool?.kind === 'guardian' && this.selectedTool.uid === uid) {
+      this.selectedTool = null;
+      this.ui.setSelectedTool(null);
+    } else {
+      this.selectedTool = { kind: 'guardian', id: card.id, uid };
+      this.clearTowerSelection();
+      this.ui.setSelectedTool('guardian', card.id);
+    }
+    this.audio.play('click');
+    this.refreshRecruitUi();
+    this.updateInteractionPrompt();
+  }
+
+  private dismissBenchCard(uid: number) {
+    if (this.phase !== 'playing') return;
+    const card = this.bench.find((entry) => entry.uid === uid);
+    if (!card) return;
+    this.bench = this.bench.filter((entry) => entry.uid !== uid);
+    if (this.selectedTool?.kind === 'guardian' && this.selectedTool.uid === uid) {
+      this.selectedTool = null;
+      this.ui.setSelectedTool(null);
+    }
+    this.ui.toast(`劝返 ${GUARDIANS[card.id].name}：不返还金币`, 'default');
+    this.audio.play('click');
+    this.refreshRecruitUi();
+    this.updateHudNow();
+    this.updateInteractionPrompt();
+  }
+
+  private canPlaceGuardian(plot: PlotRuntime | null | undefined) {
+    if (!plot) return false;
+    if (plot.state === 'tower' || plot.state === 'guardian') return false;
+    if (plot.reclaim || plot.scorched || plot.crop) return false;
+    return true;
+  }
+
+  private placeGuardian(plotIndex: number, uid?: number) {
+    if (this.phase !== 'playing') return false;
+    const plot = this.plots[plotIndex];
+    if (!plot) return false;
+    const card =
+      uid !== undefined
+        ? this.bench.find((entry) => entry.uid === uid)
+        : this.selectedTool?.kind === 'guardian'
+          ? this.bench.find((entry) => entry.uid === this.selectedTool?.uid)
+          : undefined;
+    if (!card) {
+      this.nudgeError('先在乡约亭招募乡勇，再从待命席选一位');
+      return false;
+    }
+    if (!this.canPlaceGuardian(plot)) {
+      this.nudgeError('这块地不能安置乡勇：需要空地（不能有作物、焦土或用开垦中）');
+      return false;
+    }
+    const def = GUARDIANS[card.id];
+    const art = this.art.guardian(card.id, 1);
+    art.group.position.set(0, 0.18, 0);
+    art.group.rotation.y = 0.3 + ((plotIndex * 1.7) % 6.28);
+    this.world.plotVisuals[plotIndex].group.add(art.group);
+    const level = def.levels[0];
+    const guardian: GuardianRuntime = {
+      id: card.id,
+      plot: plot.spec,
+      level: 1,
+      cooldown: 0,
+      group: art.group,
+      range: level.range,
+      damage: level.damage,
+      splash: level.splash,
+      slow: level.slow,
+      slowDuration: level.slowDuration,
+      fireCooldown: level.cooldown,
+      recruitedCost: this.recruitCost(),
+    };
+    this.guardians.push(guardian);
+    plot.underlying = plot.state === 'farmland' ? 'farmland' : 'wild';
+    plot.state = 'guardian';
+    plot.crop = null;
+    plot.scorched = false;
+    this.clearCropVisual(this.world.plotVisuals[plotIndex]);
+    this.syncPlot(plot);
+    this.bench = this.bench.filter((entry) => entry.uid !== card.uid);
+    this.stats.guardsPlaced += 1;
+    const next = this.bench[0];
+    this.selectedTool = next ? { kind: 'guardian', id: next.id, uid: next.uid } : null;
+    this.ui.setSelectedTool(next ? 'guardian' : null, next?.id);
+    this.particles.burstBuild(new Vector3(plot.spec.x, 0.7, plot.spec.z));
+    this.audio.play('build');
+    this.ui.toast(
+      `${def.name} 在${plot.underlying === 'farmland' ? '农田' : '荒地'}上落脚${def.aura ? ` · ${def.aura.label}` : ''}`,
+      'default',
+    );
+    this.refreshRecruitUi();
+    this.refreshTowerBuffs();
+    this.updateHudNow();
+    this.updateInteractionPrompt();
+    return true;
+  }
+
+  private guardianAt(plotIndex: number) {
+    return this.guardians.find((guardian) => guardian.plot.index === plotIndex) ?? null;
+  }
+
+  private adjacentPlots(plot: PlotRuntime): PlotRuntime[] {
+    return this.plots.filter(
+      (other) =>
+        other !== plot &&
+        Math.abs(other.spec.col - plot.spec.col) + Math.abs(other.spec.row - plot.spec.row) === 1,
+    );
+  }
+
+  private auraBonus(plot: PlotRuntime, kind: 'farmGrowth' | 'towerDamage' | 'towerRange' | 'guardDamage') {
+    let bonus = 0;
+    for (const other of this.adjacentPlots(plot)) {
+      if (other.state !== 'guardian') continue;
+      const guardian = this.guardianAt(other.spec.index);
+      if (!guardian) continue;
+      const def = GUARDIANS[guardian.id];
+      if (def.aura?.kind === kind) bonus += def.aura.value * guardian.level;
+    }
+    return bonus;
+  }
+
+  private towerDamageAt(plot: PlotRuntime) {
+    return 1 + this.auraBonus(plot, 'towerDamage');
+  }
+
+  private towerRangeAt(plot: PlotRuntime) {
+    return this.towerRangeMul() * (1 + this.auraBonus(plot, 'towerRange'));
+  }
+
+  private guardianDamageAt(plot: PlotRuntime) {
+    return 1 + this.auraBonus(plot, 'guardDamage');
+  }
+
+  private findGuardianMergePartner(guardian: GuardianRuntime): GuardianRuntime | null {
+    if (guardian.level >= 3) return null;
+    return (
+      this.guardians.find(
+        (other) =>
+          other !== guardian &&
+          other.id === guardian.id &&
+          other.level === guardian.level &&
+          Math.abs(other.plot.col - guardian.plot.col) + Math.abs(other.plot.row - guardian.plot.row) === 1,
+      ) ?? null
+    );
+  }
+
+  private applyGuardianLevel(guardian: GuardianRuntime, nextLevel: 2 | 3) {
+    const def = GUARDIANS[guardian.id];
+    guardian.group.removeFromParent();
+    const art = this.art.guardian(guardian.id, nextLevel);
+    art.group.position.set(0, 0.18, 0);
+    art.group.rotation.y = 0.3 + ((guardian.plot.index * 1.7) % 6.28);
+    this.world.plotVisuals[guardian.plot.index].group.add(art.group);
+    guardian.group = art.group;
+    guardian.level = nextLevel;
+    const stats = def.levels[nextLevel - 1];
+    guardian.damage = stats.damage;
+    guardian.range = stats.range;
+    guardian.splash = stats.splash;
+    guardian.slow = stats.slow;
+    guardian.slowDuration = stats.slowDuration;
+    guardian.cooldown = Math.min(guardian.cooldown, stats.cooldown);
+    guardian.fireCooldown = stats.cooldown;
+  }
+
+  private mergeGuardian(guardian: GuardianRuntime) {
+    if (this.phase !== 'playing') return false;
+    if (guardian.level >= 3) {
+      this.nudgeError('这位乡勇已经到最高阶，不能再合成');
+      return false;
+    }
+    const partner = this.findGuardianMergePartner(guardian);
+    if (!partner) {
+      this.nudgeError('合成需要一位相邻的、同类型同阶的乡勇');
+      return false;
+    }
+    const plot = this.plots[partner.plot.index];
+    partner.group.removeFromParent();
+    this.guardians = this.guardians.filter((entry) => entry !== partner);
+    if (plot) {
+      plot.state = plot.underlying;
+      plot.scorched = false;
+      plot.crop = null;
+      this.syncPlot(plot);
+    }
+    this.applyGuardianLevel(guardian, (guardian.level + 1) as 2 | 3);
+    this.stats.merges += 1;
+    this.particles.burstBuild(new Vector3(guardian.plot.x, 0.8, guardian.plot.z));
+    this.audio.play('upgrade');
+    this.ui.toast(`乡勇合成：${GUARDIANS[guardian.id].name} → Lv.${guardian.level}`, 'gold');
+    this.showGuardianInspector(guardian);
+    this.refreshTowerBuffs();
+    this.updateHudNow();
+    return true;
+  }
+
+  private selectGuardianObject(guardian: GuardianRuntime) {
+    if (this.selectedTower) this.selectedTower.rangeRing.visible = false;
+    this.selectedTower = null;
+    this.selectedGuardian = guardian;
+    this.selectedTool = null;
+    this.ui.setSelectedTool(null);
+    this.showGuardianInspector(guardian);
+    this.previewRange.visible = false;
+    this.player.releasePointer();
+  }
+
+  private showGuardianInspector(guardian: GuardianRuntime) {
+    const def = GUARDIANS[guardian.id];
+    const level = def.levels[guardian.level - 1];
+    const stats: InspectorData['stats'] = [
+      { label: '阶位', value: `Lv.${guardian.level}` },
+      { label: '类型', value: def.role },
+      { label: '伤害', value: level.damage > 0 ? (level.damage * this.guardianDamageAt(this.plots[guardian.plot.index])).toFixed(0) : '—' },
+      { label: '射程', value: level.range > 0 ? level.range.toFixed(1) : '—' },
+    ];
+    if (def.aura) {
+      const sources = this.adjacentPlots(this.plots[guardian.plot.index]).filter((plot) => plot.state === 'guardian').length;
+      stats.push({ label: '光环', value: `${def.aura.icon} ${def.aura.label}` });
+      stats.push({ label: '相邻乡勇', value: `${sources}` });
+    }
+    const partner = this.findGuardianMergePartner(guardian);
+    const mergeLabel =
+      guardian.level >= 3 ? '' : partner ? `合成 Lv.${guardian.level + 1}` : '合成：需相邻同阶乡勇';
+    const note = def.aura
+      ? `${def.description} 光环只影响上下左右相邻的地块。`
+      : `${def.description} 乡勇会自动攻击进入射程的野兽。`;
+    this.ui.showInspector({
+      icon: def.icon,
+      name: def.name,
+      sub: `${def.en} · 乡勇 Lv.${guardian.level}`,
+      stats,
+      note,
+      upgradeLabel: '',
+      upgradeEnabled: false,
+      mergeLabel,
+      mergeEnabled: !!partner && this.phase === 'playing',
+      sellLabel: '劝返（不返还金币）',
+      sellEnabled: this.phase === 'playing',
+    });
+  }
+
+  private dismissGuardian(guardian: GuardianRuntime) {
+    const plot = this.plots[guardian.plot.index];
+    guardian.group.removeFromParent();
+    this.guardians = this.guardians.filter((entry) => entry !== guardian);
+    if (plot) {
+      plot.state = plot.underlying;
+      plot.scorched = false;
+      plot.crop = null;
+      this.syncPlot(plot);
+    }
+    this.clearTowerSelection();
+    this.particles.spawn(new Vector3(guardian.plot.x, 0.55, guardian.plot.z), 0xe4ddd0, 12, {
+      speed: 1.8,
+      life: 0.7,
+      size: 0.08,
+      gravity: 3.5,
+      up: 1.6,
+    });
+    this.audio.play('sell');
+    this.ui.toast(`已劝返 ${GUARDIANS[guardian.id].name}，地块恢复为${plot?.underlying === 'farmland' ? '农田' : '荒地'}`, 'default');
+    this.refreshTowerBuffs();
+    this.updateHudNow();
+    this.updateInteractionPrompt();
+  }
+
+  private findGuardianTarget(guardian: GuardianRuntime): EnemyRuntime | null {
+    let best: EnemyRuntime | null = null;
+    for (const enemy of this.enemies) {
+      if (enemy.dead) continue;
+      const dx = enemy.group.position.x - guardian.plot.x;
+      const dz = enemy.group.position.z - guardian.plot.z;
+      if (dx * dx + dz * dz > guardian.range * guardian.range) continue;
+      if (!best || enemy.progress > best.progress) best = enemy;
+    }
+    return best;
+  }
+
+  private fireGuardian(guardian: GuardianRuntime, target: EnemyRuntime) {
+    const def = GUARDIANS[guardian.id];
+    const level = def.levels[guardian.level - 1];
+    const origin = new Vector3(guardian.plot.x, 1.05, guardian.plot.z);
+    const targetPos = target.group.position.clone().add(new Vector3(0, ENEMIES[target.id].height * 0.55, 0));
+    const damage = level.damage * this.guardianDamageAt(this.plots[guardian.plot.index]);
+    this.fireBeam(origin, targetPos, def.projectileColor);
+    this.damageEnemy(target, damage);
+    if (guardian.slow > 0) {
+      target.slowFactor = Math.max(target.slowFactor, guardian.slow);
+      target.slowTimer = Math.max(target.slowTimer, guardian.slowDuration);
+    }
+    this.particles.spawn(targetPos, def.projectileColor, 4, { speed: 1.1, life: 0.35, size: 0.055, gravity: 1.4, up: 1.2 });
+    this.playShot(def.id === 'bowman' ? 'arrow' : 'hit');
+  }
+
+  private updateGuardians(dt: number) {
+    for (const guardian of this.guardians) {
+      if (guardian.cooldown > 0) guardian.cooldown -= dt;
+      const spin = guardian.group.getObjectByName('guard-spin');
+      if (spin) spin.rotation.y += dt * 0.9;
+      if (guardian.damage <= 0) continue;
+      const target = this.findGuardianTarget(guardian);
+      if (!target || guardian.cooldown > 0) continue;
+      guardian.cooldown = guardian.fireCooldown;
+      this.fireGuardian(guardian, target);
+    }
   }
 
   /* ───────────────────────────── waves / enemies ───────────────────────────── */
@@ -1843,7 +2278,7 @@ export class Game {
       if (enemy.dead) continue;
       const dx = enemy.group.position.x - tower.plot.x;
       const dz = enemy.group.position.z - tower.plot.z;
-      const range = tower.range * this.towerRangeMul();
+      const range = tower.range * this.towerRangeAt(this.plots[tower.plot.index]);
       if (dx * dx + dz * dz > range * range) continue;
       if (!best || enemy.progress > best.progress) best = enemy;
     }
@@ -1852,6 +2287,7 @@ export class Game {
 
   private fireTower(tower: TowerRuntime, target: EnemyRuntime) {
     const def = TOWERS[tower.id];
+    const damage = tower.damage * this.towerDamageAt(this.plots[tower.plot.index]);
     const origin =
       tower.id === 'arrow'
         ? new Vector3(tower.plot.x, 3.6, tower.plot.z)
@@ -1861,7 +2297,7 @@ export class Game {
     if (tower.id === 'star') {
       const targetPos = target.group.position.clone().add(new Vector3(0, ENEMIES[target.id].height * 0.6, 0));
       this.fireBeam(origin, targetPos, def.projectileColor);
-      this.damageEnemy(target, tower.damage);
+      this.damageEnemy(target, damage);
       if (tower.slow > 0) {
         target.slowFactor = Math.max(target.slowFactor, tower.slow);
         target.slowTimer = Math.max(target.slowTimer, tower.slowDuration);
@@ -1884,7 +2320,7 @@ export class Game {
         kind: 'arrow',
         mesh,
         speed: 16,
-        damage: tower.damage,
+        damage,
         target,
         lastTarget: target.group.position.clone().add(new Vector3(0, ENEMIES[target.id].height * 0.5, 0)),
         life: 2.5,
@@ -1904,7 +2340,7 @@ export class Game {
       end: targetPos,
       duration: Math.max(0.32, distance / 9),
       t: 0,
-      damage: tower.damage,
+      damage,
       splash: tower.splash,
       arc: 1.8 + distance * 0.16,
       trailTimer: 0,
@@ -2088,7 +2524,7 @@ export class Game {
       const dz = plot.spec.z - this.player.position.z;
       const distance = Math.hypot(dx, dz);
       if (distance > WORLD.player.interactRange) continue;
-      const height = plot.state === 'tower' ? 1.25 : 0.5;
+      const height = plot.state === 'tower' ? 1.25 : plot.state === 'guardian' ? 1.1 : 0.5;
       const toTarget = new Vector3(plot.spec.x, height, plot.spec.z).sub(eye).normalize();
       const dot = toTarget.dot(direction);
       if (dot < 0.05) continue;
@@ -2116,6 +2552,16 @@ export class Game {
       };
     }
     if (plot.state === 'wild') {
+      if (tool?.kind === 'guardian') {
+        const def = GUARDIANS[tool.id as GuardianId];
+        return {
+          key: 'E',
+          title: `在荒地上安置 ${def.name}`,
+          detail: `${def.role} · 占用地块 · ${def.aura ? def.aura.label : '自动攻击进入射程的野兽'}`,
+          tone: 'action',
+          actionable: true,
+        };
+      }
       if (tool?.kind === 'tower') {
         const def = TOWERS[tool.id as TowerId];
         return {
@@ -2142,6 +2588,18 @@ export class Game {
         key: 'E',
         title: `查看 ${def.name} Lv.${tower.level}`,
         detail: '打开面板升级或拆除，拆除后恢复地块',
+        tone: 'info',
+        actionable: true,
+      };
+    }
+    if (plot.state === 'guardian') {
+      const guardian = this.guardianAt(plot.spec.index);
+      if (!guardian) return null;
+      const def = GUARDIANS[guardian.id];
+      return {
+        key: 'E',
+        title: `查看 ${def.name} Lv.${guardian.level}`,
+        detail: def.aura ? `${def.aura.label} · 相邻地块才有光环` : '打开面板可合成或劝返',
         tone: 'info',
         actionable: true,
       };
@@ -2175,6 +2633,16 @@ export class Game {
         actionable: false,
       };
     }
+    if (tool?.kind === 'guardian') {
+      const def = GUARDIANS[tool.id as GuardianId];
+      return {
+        key: 'E',
+        title: `在空农田上安置 ${def.name}`,
+        detail: `${def.role} · 会占用这块农田 · ${def.aura ? def.aura.label : '自动攻击'}`,
+        tone: 'action',
+        actionable: true,
+      };
+    }
     if (tool?.kind === 'tower') {
       const def = TOWERS[tool.id as TowerId];
       return {
@@ -2198,7 +2666,7 @@ export class Game {
     return {
       key: '',
       title: '空农田',
-      detail: '按 1–3 选作物，或 4–6 选防御塔',
+      detail: '按 1–3 选作物，4–6 选防御塔，或去乡约亭招募乡勇',
       tone: 'info',
       actionable: false,
     };
@@ -2216,12 +2684,19 @@ export class Game {
       this.targetPlot = plot;
       if (plot) this.viewFor(plot.spec.index).highlight.visible = true;
     }
-    if (plot && this.selectedTool?.kind === 'tower' && plot.state !== 'tower' && !plot.scorched && !plot.reclaim && !plot.crop) {
+    if (plot && this.selectedTool?.kind === 'tower' && plot.state !== 'tower' && plot.state !== 'guardian' && !plot.scorched && !plot.reclaim && !plot.crop) {
       const def = TOWERS[this.selectedTool.id as TowerId];
       this.previewRange.position.set(plot.spec.x, 0.36, plot.spec.z);
       this.previewRange.scale.setScalar(def.levels[0].range);
       (this.previewRange.material as MeshBasicMaterial).color.setHex(def.accent);
       this.previewRange.visible = true;
+    } else if (plot && this.selectedTool?.kind === 'guardian' && this.canPlaceGuardian(plot)) {
+      const def = GUARDIANS[this.selectedTool.id as GuardianId];
+      const range = def.levels[0].range;
+      this.previewRange.position.set(plot.spec.x, 0.36, plot.spec.z);
+      this.previewRange.scale.setScalar(Math.max(1.2, range));
+      (this.previewRange.material as MeshBasicMaterial).color.setHex(def.accent);
+      this.previewRange.visible = range > 0;
     } else {
       this.previewRange.visible = false;
     }
@@ -2251,8 +2726,14 @@ export class Game {
       if (tower) this.selectTowerObject(tower);
       return;
     }
+    if (plot.state === 'guardian') {
+      const guardian = this.guardianAt(plot.spec.index);
+      if (guardian) this.selectGuardianObject(guardian);
+      return;
+    }
     if (plot.state === 'wild') {
-      if (this.selectedTool?.kind === 'tower') this.buildTower(plot.spec.index, this.selectedTool.id as TowerId);
+      if (this.selectedTool?.kind === 'guardian') this.placeGuardian(plot.spec.index, this.selectedTool.uid);
+      else if (this.selectedTool?.kind === 'tower') this.buildTower(plot.spec.index, this.selectedTool.id as TowerId);
       else this.startReclaim(plot.spec.index);
       this.updateInteractionPrompt();
       return;
@@ -2268,12 +2749,14 @@ export class Game {
       this.updateInteractionPrompt();
       return;
     }
-    if (this.selectedTool?.kind === 'tower') {
+    if (this.selectedTool?.kind === 'guardian') {
+      this.placeGuardian(plot.spec.index, this.selectedTool.uid);
+    } else if (this.selectedTool?.kind === 'tower') {
       this.buildTower(plot.spec.index, this.selectedTool.id as TowerId);
     } else if (this.selectedTool?.kind === 'crop') {
       this.plantCrop(plot.spec.index, this.selectedTool.id as CropId);
     } else {
-      this.ui.toast('先在下方选一种作物或防御塔，再按 E', 'default');
+      this.ui.toast('先在下方选作物/防御塔，或去乡约亭招募乡勇，再按 E', 'default');
     }
     this.updateInteractionPrompt();
   }
@@ -2284,12 +2767,21 @@ export class Game {
     if (hit) {
       const plot = this.plots[hit.index];
       const tower = plot ? this.towerAt(plot.spec.index) : null;
+      const guardian = plot ? this.guardianAt(plot.spec.index) : null;
+      if (guardian) {
+        this.selectGuardianObject(guardian);
+        return;
+      }
       if (tower) {
         this.selectTowerObject(tower);
         return;
       }
+      if (plot && this.selectedTool?.kind === 'guardian' && this.canPlaceGuardian(plot)) {
+        this.placeGuardian(plot.spec.index, this.selectedTool.uid);
+        return;
+      }
     }
-    this.ui.toast('切回第一人称（V），走到地块旁才能开垦、播种或建塔', 'default');
+    this.ui.toast('切回第一人称（V），走到地块旁才能开垦、播种、建塔或安置乡勇', 'default');
   }
 
   private updateOverviewHover() {
@@ -2311,12 +2803,18 @@ export class Game {
     }
     this.ui.showTooltip(this.plotTooltip(plot), this.lastPointer.x, this.lastPointer.y);
     const tower = this.towerAt(plot.spec.index);
-    if (this.selectedTool?.kind === 'tower' && !tower && plot.state !== 'tower' && !plot.scorched && !plot.crop && !plot.reclaim) {
+    if (this.selectedTool?.kind === 'tower' && !tower && plot.state !== 'tower' && plot.state !== 'guardian' && !plot.scorched && !plot.crop && !plot.reclaim) {
       const def = TOWERS[this.selectedTool.id as TowerId];
       this.previewRange.position.set(plot.spec.x, 0.36, plot.spec.z);
       this.previewRange.scale.setScalar(def.levels[0].range);
       (this.previewRange.material as MeshBasicMaterial).color.setHex(def.accent);
       this.previewRange.visible = true;
+    } else if (this.selectedTool?.kind === 'guardian' && this.canPlaceGuardian(plot)) {
+      const def = GUARDIANS[this.selectedTool.id as GuardianId];
+      this.previewRange.position.set(plot.spec.x, 0.36, plot.spec.z);
+      this.previewRange.scale.setScalar(Math.max(1.2, def.levels[0].range));
+      (this.previewRange.material as MeshBasicMaterial).color.setHex(def.accent);
+      this.previewRange.visible = def.levels[0].range > 0;
     } else {
       this.previewRange.visible = false;
     }
@@ -2333,6 +2831,10 @@ export class Game {
     const tool = this.selectedTool;
     if (plot.reclaim) return `<b>开垦中</b><br>${Math.floor(Math.min(1, plot.reclaim.elapsed / plot.reclaim.total) * 100)}% · 还需约 ${Math.max(0, plot.reclaim.total - plot.reclaim.elapsed).toFixed(1)} 秒`;
     if (plot.state === 'wild') {
+      if (tool?.kind === 'guardian') {
+        const def = GUARDIANS[tool.id as GuardianId];
+        return `<b>荒地 · 安置 ${def.name}</b><br>${def.role} · 占用地块<br>第一人称走到近处按 E`;
+      }
       if (tool?.kind === 'tower') {
         const def = TOWERS[tool.id as TowerId];
         return `<b>荒地 · 建 ${def.name}</b><br>${def.starCost ? `${def.starCost} 星辉 + ` : ''}${def.cost} 金币<br>第一人称走到近处按 E`;
@@ -2344,13 +2846,18 @@ export class Game {
       const def = tower ? TOWERS[tower.id] : null;
       return `<b>塔基 · ${def?.name ?? '防御塔'}${tower ? ` Lv.${tower.level}` : ''}</b><br>拆除后恢复为${plot.underlying === 'farmland' ? '农田' : '荒地'}`;
     }
+    if (plot.state === 'guardian') {
+      const guardian = this.guardianAt(plot.spec.index);
+      const def = guardian ? GUARDIANS[guardian.id] : null;
+      return `<b>乡勇 · ${def?.name ?? '乡勇'}${guardian ? ` Lv.${guardian.level}` : ''}</b><br>${def?.aura?.label ?? '自动攻击进入射程的野兽'}`;
+    }
     if (plot.scorched) return `<b>焦土</b><br>修复需要 ${WORLD.farm.repairCost} 金币`;
     if (plot.crop) {
       const def = CROPS[plot.crop.type];
       if (plot.crop.mature) return `<b>${def.name} · 成熟</b><br>可收获 +${def.yieldGold} 金币${def.yieldStar ? ` +${def.yieldStar} 星辉` : ''}`;
       return `<b>${def.name} · 生长中</b><br>${Math.min(99, Math.floor((plot.crop.elapsed / def.growTime) * 100))}%`;
     }
-    return '<b>空农田</b><br>第一人称走到近处按 E 播种';
+    return '<b>空农田</b><br>第一人称走到近处按 E 播种或安置乡勇';
   }
 
   private clearHighlights() {
@@ -2377,6 +2884,7 @@ export class Game {
       this.clearTowerSelection();
     }
     this.audio.play('click');
+    this.refreshRecruitUi();
     this.updateInteractionPrompt();
   }
 
@@ -2391,6 +2899,7 @@ export class Game {
       this.clearTowerSelection();
     }
     this.audio.play('click');
+    this.refreshRecruitUi();
     this.updateInteractionPrompt();
   }
 
@@ -2426,6 +2935,7 @@ export class Game {
         else if (this.selectedTool) {
           this.selectedTool = null;
           this.ui.setSelectedTool(null);
+          this.refreshRecruitUi();
           this.updateInteractionPrompt();
         } else if (this.phase === 'playing') {
           this.togglePause();
@@ -2471,6 +2981,18 @@ export class Game {
           break;
         case 'Digit6':
           this.selectTower('star');
+          break;
+        case 'Digit7':
+        case 'Digit8':
+        case 'Digit9': {
+          const benchIndex = Number(event.code.slice(-1)) - 7;
+          const card = this.bench[benchIndex];
+          if (card) this.selectGuardianTool(card.uid);
+          break;
+        }
+        case 'KeyR':
+          event.preventDefault();
+          this.recruit();
           break;
         case 'KeyT':
           this.toggleSpeed();
@@ -2547,6 +3069,7 @@ export class Game {
     this.updateEnemies(dt);
     this.cleanupEnemies();
     if (this.phase !== 'playing') return;
+    this.updateGuardians(dt);
     this.updateTowers(dt);
     this.updateProjectiles(dt);
     this.cleanupEnemies();
@@ -2612,6 +3135,8 @@ export class Game {
       canStart,
     });
     if (this.selectedTower) this.showTowerInspector(this.selectedTower);
+    if (this.selectedGuardian) this.showGuardianInspector(this.selectedGuardian);
+    this.refreshRecruitUi();
   }
 
   private clearDynamicWorld() {
@@ -2626,6 +3151,8 @@ export class Game {
       tower.rangeRing.removeFromParent();
     }
     this.towers = [];
+    for (const guardian of this.guardians) guardian.group.removeFromParent();
+    this.guardians = [];
     for (const projectile of this.projectiles) projectile.mesh.removeFromParent();
     this.projectiles = [];
     for (const beam of this.beams) {
@@ -2650,6 +3177,7 @@ export class Game {
     this.activeReclaim = null;
     this.targetPlot = null;
     this.selectedTower = null;
+    this.selectedGuardian = null;
     this.ui.hideInspector();
     this.ui.setInteractPrompt(null);
     this.clearHighlights();
@@ -2755,6 +3283,25 @@ export class Game {
             damage: tower.damage,
             range: tower.range,
           })),
+          guardians: game.guardians.map((guardian) => ({
+            id: guardian.id,
+            plot: guardian.plot.index,
+            level: guardian.level,
+            damage: guardian.damage,
+            range: guardian.range,
+            aura: GUARDIANS[guardian.id].aura?.kind ?? null,
+            auraBonus: GUARDIANS[guardian.id].aura ? `${GUARDIANS[guardian.id].aura!.label}（Lv.${guardian.level}）` : '',
+          })),
+          towerAuras: game.towers.map((tower) => ({
+            plot: tower.plot.index,
+            damage: game.auraBonus(game.plots[tower.plot.index], 'towerDamage'),
+            range: game.auraBonus(game.plots[tower.plot.index], 'towerRange'),
+          })),
+          recruits: {
+            cost: game.recruitCost(),
+            draws: game.recruitDraws,
+            bench: game.bench.map((card) => ({ ...card })),
+          },
           stats: { ...game.stats },
           pathLength: game.world.path.length,
         };
@@ -2850,6 +3397,52 @@ export class Game {
       canMerge(plot: number) {
         const tower = game.towerAt(plot);
         return tower ? !!game.findMergePartner(tower) : false;
+      },
+      recruit() {
+        game.recruit();
+        return game.bench.map((card) => ({ ...card }));
+      },
+      selectGuardian(uid: number) {
+        game.selectGuardianTool(uid);
+      },
+      placeGuardian(plot: number, uid?: number) {
+        return game.placeGuardian(plot, uid);
+      },
+      dismissBench(uid: number) {
+        game.dismissBenchCard(uid);
+      },
+      addGuardianCard(id: GuardianId, count = 1) {
+        for (let i = 0; i < Math.min(9, Math.max(1, Math.floor(count))); i++) {
+          game.bench.push({ uid: game.nextGuardianUid++, id });
+        }
+        const first = game.bench[0];
+        if (first) {
+          game.selectedTool = { kind: 'guardian', id: first.id, uid: first.uid };
+          game.ui.setSelectedTool('guardian', first.id);
+        }
+        game.refreshRecruitUi();
+        game.updateHudNow();
+        return game.bench.map((card) => ({ ...card }));
+      },
+      dismissGuardian(plot: number) {
+        const guardian = game.guardianAt(plot);
+        if (!guardian) return false;
+        game.dismissGuardian(guardian);
+        return true;
+      },
+      mergeGuardian(plot: number) {
+        const guardian = game.guardianAt(plot);
+        return guardian ? game.mergeGuardian(guardian) : false;
+      },
+      selectGuardianAt(plot: number) {
+        const guardian = game.guardianAt(plot);
+        if (!guardian) return false;
+        game.selectGuardianObject(guardian);
+        return true;
+      },
+      canMergeGuardian(plot: number) {
+        const guardian = game.guardianAt(plot);
+        return guardian ? !!game.findGuardianMergePartner(guardian) : false;
       },
       chooseBlessing(id: BlessingId) {
         game.chooseBlessing(id);

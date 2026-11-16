@@ -1,0 +1,1063 @@
+{
+  "version": 1,
+  "title": "《穗守》白模占位资产清单 · White-box placeholder manifest",
+  "unit": "1 Blender unit = 1 meter",
+  "engine": "Three.js 0.187 / glTF 2.0 GLB",
+  "palette": {
+    "paper": "#f2efe6",
+    "paperShade": "#e4ddd0",
+    "ink": "#4b514c",
+    "inkSoft": "#767d75",
+    "earth": "#b09571",
+    "straw": "#cbb283",
+    "jade": "#8d9f87",
+    "vermilion": "#a84b38",
+    "glow": "#e6d6a4"
+  },
+  "style": "中国田园水墨素模：无贴图、平面着色、低多边形；青瓦白墙/梯田/稻穗/竹篱意象；配色只用米白、墨灰、暖土、淡青与少量朱砂。",
+  "orientationRule": "Three.js 中 +Z 为模型正面，对应 Blender 的 -Y；导出设置 +Y up，游戏原点在模型底部几何中心。",
+  "items": [
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_house",
+      "name": "青瓦白墙民居",
+      "en": "Whitewashed Jiangnan Farmhouse",
+      "gameRole": "农舍地标 / 出生点背景建筑",
+      "description": "单层三开间正房带一侧厢房，白灰墙、墨灰瓦、木格窗，前有小院矮墙与柴门。屋顶为双坡青瓦，檐口微微上翘；屋后有一截烟囱和一捆柴。",
+      "descriptionEn": "A single-storey three-bay farmhouse with one side wing: whitewashed walls, dark grey tiled double-pitch roof with slightly upturned eaves, timber lattice windows, a low courtyard wall and a bamboo gate, a chimney and a small firewood stack.",
+      "dimensions": {
+        "width": 7.2,
+        "height": 4.0,
+        "depth": 5.1
+      },
+      "proportions": "正房约 5.0 m 宽、檐口高约 2.5 m、屋脊高约 3.6 m；厢房高约为正房的 70%，总高约 4.0 m。",
+      "triangles": 3200,
+      "notes": "replace with env_house.glb; placed at WORLD.decorations.farmhouse",
+      "file": "public/assets/whitebox/env_house.glb",
+      "anchor": "env-house",
+      "budgetLabel": "≤ 3200 tris"
+    },
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_waterwheel",
+      "name": "竹木水车",
+      "en": "Bamboo Waterwheel Mill",
+      "gameRole": "农舍旁的动态装饰（风车槽位）",
+      "description": "一座架在石砌水槽上的竹木大水车，轮辐 8 根、外圈两道竹箍，带小茅草棚与引水槽。轮子需与静止支架分开，以便游戏旋转。",
+      "descriptionEn": "A bamboo-and-timber waterwheel on a stone channel, eight spokes, two bamboo rims, with a small thatched shelter and a flume. The wheel must be a separate child object so the game can rotate it.",
+      "dimensions": {
+        "width": 4.2,
+        "height": 4.0,
+        "depth": 2.6
+      },
+      "proportions": "水轮直径约 2.4 m，中心离地约 1.45 m；棚顶高约 3.6 m。",
+      "triangles": 2400,
+      "notes": "子对象命名 Waterwheel 用于旋转动画",
+      "file": "public/assets/whitebox/env_waterwheel.glb",
+      "anchor": "env-waterwheel",
+      "budgetLabel": "≤ 2400 tris"
+    },
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_tea_shed",
+      "name": "乡集茶棚",
+      "en": "Village Tea Shed",
+      "gameRole": "乡集 / 行商摊位背景",
+      "description": "四根竹柱撑起的方锥茅草棚，下面一张矮柜台、三只陶罐和一面朱砂布招。",
+      "descriptionEn": "A square thatched canopy on four bamboo posts, with a low counter, three ceramic jars and a small vermilion cloth banner.",
+      "dimensions": {
+        "width": 3.2,
+        "height": 2.6,
+        "depth": 2.0
+      },
+      "proportions": "檐口高约 1.8 m，棚顶最高 2.6 m；柜台高 0.55 m。",
+      "triangles": 1600,
+      "file": "public/assets/whitebox/env_tea_shed.glb",
+      "anchor": "env-tea-shed",
+      "budgetLabel": "≤ 1600 tris",
+      "notes": ""
+    },
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_well",
+      "name": "青石井",
+      "en": "Stone Village Well",
+      "gameRole": "农舍区装饰",
+      "description": "青石砌成的圆井，井口有木架与横梁，顶上盖一小片青瓦顶，垂着绳与木桶。",
+      "descriptionEn": "A round stone well with a timber frame, a crossbeam, a small tiled roof, and a rope with a wooden bucket.",
+      "dimensions": {
+        "width": 1.6,
+        "height": 2.3,
+        "depth": 1.6
+      },
+      "proportions": "井身高 0.9 m，木架高 2.3 m，屋檐直径 1.6 m。",
+      "triangles": 1200,
+      "file": "public/assets/whitebox/env_well.glb",
+      "anchor": "env-well",
+      "budgetLabel": "≤ 1200 tris",
+      "notes": ""
+    },
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_haystack",
+      "name": "草垛",
+      "en": "Straw Haystack",
+      "gameRole": "农事装饰",
+      "description": "圆锥形稻草垛，外圈三道草绳，中央插一根木杆，顶部收成尖顶。",
+      "descriptionEn": "A conical straw haystack bound by three straw ropes around a central pole, with a pointed top.",
+      "dimensions": {
+        "width": 1.5,
+        "height": 2.0,
+        "depth": 1.5
+      },
+      "proportions": "底部直径 1.5 m，草垛本体高 1.7 m，木杆高出 0.3 m。",
+      "triangles": 700,
+      "file": "public/assets/whitebox/env_haystack.glb",
+      "anchor": "env-haystack",
+      "budgetLabel": "≤ 700 tris",
+      "notes": ""
+    },
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_basket",
+      "name": "竹筐",
+      "en": "Bamboo Harvest Basket",
+      "gameRole": "农事道具装饰",
+      "description": "敞口圆竹筐，外壁由 8 根竹片围成，口沿与底沿各一道竹箍。",
+      "descriptionEn": "A round open bamboo harvest basket made from eight bamboo slats with a rim hoop and a base hoop.",
+      "dimensions": {
+        "width": 0.9,
+        "height": 0.65,
+        "depth": 0.9
+      },
+      "proportions": "口径 0.9 m，底径 0.65 m，高 0.65 m。",
+      "triangles": 500,
+      "file": "public/assets/whitebox/env_basket.glb",
+      "anchor": "env-basket",
+      "budgetLabel": "≤ 500 tris",
+      "notes": ""
+    },
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_jar",
+      "name": "陶瓮",
+      "en": "Glazed Clay Jar",
+      "gameRole": "茶棚/农舍道具",
+      "description": "鼓腹陶瓮，带小口与陶盖，腹部圆润，表面无釉光。",
+      "descriptionEn": "A round-bellied clay jar with a narrow mouth and a clay lid, matte unglazed surface.",
+      "dimensions": {
+        "width": 0.85,
+        "height": 1.0,
+        "depth": 0.85
+      },
+      "proportions": "腹部最大直径 0.85 m，口沿直径 0.5 m，盖顶高 1.0 m。",
+      "triangles": 600,
+      "file": "public/assets/whitebox/env_jar.glb",
+      "anchor": "env-jar",
+      "budgetLabel": "≤ 600 tris",
+      "notes": ""
+    },
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_bamboo_fence",
+      "name": "竹篱",
+      "en": "Bamboo Fence Segment",
+      "gameRole": "田埂/院墙边界（2.4 m 一段，可拼接）",
+      "description": "2.4 m 长的竹篱段：3–4 根立柱、上下两道横杆、交叉斜撑，柱顶削尖。左右两端需能无缝拼接。",
+      "descriptionEn": "A 2.4 m bamboo fence segment with three or four pointed posts, two horizontal rails and crossed diagonal ties. Both ends must tile seamlessly.",
+      "dimensions": {
+        "width": 2.4,
+        "height": 1.1,
+        "depth": 0.22
+      },
+      "proportions": "柱高 1.1 m，横杆高 0.34 m 与 0.72 m；深度仅 0.22 m。",
+      "triangles": 700,
+      "file": "public/assets/whitebox/env_bamboo_fence.glb",
+      "anchor": "env-bamboo-fence",
+      "budgetLabel": "≤ 700 tris",
+      "notes": ""
+    },
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_pine",
+      "name": "松树",
+      "en": "Chinese Pine",
+      "gameRole": "林木装饰（可替换两种树形）",
+      "description": "低多边形松树，主干略弯，四层不规则伞状松针冠，层与层之间留出空隙。",
+      "descriptionEn": "A low-poly Chinese pine with a slightly bent trunk and four irregular umbrella-like needle layers with visible gaps.",
+      "dimensions": {
+        "width": 2.6,
+        "height": 4.5,
+        "depth": 2.6
+      },
+      "proportions": "冠幅约 2.6 m，树高 4.5 m；最下层冠幅最大，向上逐层收小。",
+      "triangles": 1200,
+      "file": "public/assets/whitebox/env_pine.glb",
+      "anchor": "env-pine",
+      "budgetLabel": "≤ 1200 tris",
+      "notes": ""
+    },
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_bamboo",
+      "name": "竹丛",
+      "en": "Bamboo Grove Cluster",
+      "gameRole": "竹篱外景/遮挡装饰",
+      "description": "7 根高低错落的竹子组成一丛，竹节处有环状凸起，顶部 3–4 片细长竹叶。",
+      "descriptionEn": "A cluster of seven bamboo stalks of varied heights with ring nodes and three or four slender leaves near the top.",
+      "dimensions": {
+        "width": 2.0,
+        "height": 4.2,
+        "depth": 2.0
+      },
+      "proportions": "竹丛直径 2.0 m，最高竹竿 4.2 m，最矮 2.8 m。",
+      "triangles": 1600,
+      "file": "public/assets/whitebox/env_bamboo.glb",
+      "anchor": "env-bamboo",
+      "budgetLabel": "≤ 1600 tris",
+      "notes": ""
+    },
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_rock",
+      "name": "山石",
+      "en": "Mountain Rock",
+      "gameRole": "散景岩石",
+      "description": "低多边形青灰山石，顶面较平，底部略宽，带 2–3 个自然切面。",
+      "descriptionEn": "A low-poly grey mountain rock with a flatter top, wider base and two or three natural facets.",
+      "dimensions": {
+        "width": 1.6,
+        "height": 0.9,
+        "depth": 1.4
+      },
+      "proportions": "横向较扁，高度约为宽度的 55%。",
+      "triangles": 400,
+      "file": "public/assets/whitebox/env_rock.glb",
+      "anchor": "env-rock",
+      "budgetLabel": "≤ 400 tris",
+      "notes": ""
+    },
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_stone_lantern",
+      "name": "土地庙石灯",
+      "en": "Village Stone Lantern Shrine",
+      "gameRole": "路旁石灯 / 土地庙（雕像槽位）",
+      "description": "石灯式小土地庙：圆形石基、方形石柱、灯室、四坡小石顶，灯室正面有一点暖光。",
+      "descriptionEn": "A small stone lantern shrine: round base, square pillar, lamp chamber, four-sided stone cap, and a warm glow on the front of the chamber.",
+      "dimensions": {
+        "width": 1.3,
+        "height": 2.3,
+        "depth": 1.3
+      },
+      "proportions": "基座直径 1.3 m，灯室高 0.4 m，总高 2.3 m。",
+      "triangles": 800,
+      "file": "public/assets/whitebox/env_stone_lantern.glb",
+      "anchor": "env-stone-lantern",
+      "budgetLabel": "≤ 800 tris",
+      "notes": ""
+    },
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_field_shelter",
+      "name": "田棚",
+      "en": "Straw Field Shelter",
+      "gameRole": "田边歇脚棚",
+      "description": "两坡茅草顶的简易田棚，后侧有挡风草墙，前面一张矮凳和一只竹筐。",
+      "descriptionEn": "A simple field lean-to with a two-slope straw roof, a straw windbreak at the back, a low stool and a bamboo basket in front.",
+      "dimensions": {
+        "width": 2.0,
+        "height": 1.7,
+        "depth": 2.2
+      },
+      "proportions": "前檐高 1.2 m，后檐高 1.5 m，屋顶进深 2.0 m。",
+      "triangles": 900,
+      "file": "public/assets/whitebox/env_field_shelter.glb",
+      "anchor": "env-field-shelter",
+      "budgetLabel": "≤ 900 tris",
+      "notes": ""
+    },
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_beast_gate",
+      "name": "兽径柴门",
+      "en": "Bamboo Beast-Path Gate",
+      "gameRole": "敌人出生点的山口/柴门",
+      "description": "两根粗竹门柱加一道横梁的柴门，梁上垂五条布幡（米白与朱砂相间），门内是暗色山口。布幡需要单独子对象，以便轻微摆动。",
+      "descriptionEn": "A bamboo gate with two thick posts and a lintel, five hanging cloth strips alternating rice-white and vermilion, and a dark mountain opening behind. The cloth strips should be a separate child object for gentle sway.",
+      "dimensions": {
+        "width": 2.8,
+        "height": 3.0,
+        "depth": 1.2
+      },
+      "proportions": "门柱高 2.7 m，门宽 1.9 m，横梁离地 2.62 m。",
+      "triangles": 1400,
+      "notes": "子对象命名 Charms 用于飘动",
+      "file": "public/assets/whitebox/env_beast_gate.glb",
+      "anchor": "env-beast-gate",
+      "budgetLabel": "≤ 1400 tris"
+    },
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_shrine",
+      "name": "社稷坛",
+      "en": "Village Grain Altar",
+      "gameRole": "守望之种 / 核心目标祭坛",
+      "description": "三层圆形石台，四根石柱各立一束稻穗，中央悬浮由七束稻穗围成的金色谷灵，外有两道细光环。谷灵与光环需可独立旋转。",
+      "descriptionEn": "A three-tier round stone altar with four stone posts, each holding a rice sheaf; at the centre floats a golden grain spirit ringed by seven rice stalks and two thin halos. The grain spirit and halos must be separate rotating children.",
+      "dimensions": {
+        "width": 4.6,
+        "height": 2.2,
+        "depth": 4.6
+      },
+      "proportions": "底层直径 4.6 m，台高 0.6 m，谷灵中心离地约 1.5 m。",
+      "triangles": 2600,
+      "notes": "子对象 Crystal / Halo 用于旋转",
+      "file": "public/assets/whitebox/env_shrine.glb",
+      "anchor": "env-shrine",
+      "budgetLabel": "≤ 2600 tris"
+    },
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_terrace",
+      "name": "梯田段",
+      "en": "Terraced Field Segment",
+      "gameRole": "东侧三级水田（菜单/俯瞰可见的场景地标）",
+      "description": "三级阶梯水田：每级有夯土挡墙、石砌田唇、浅水与成排秧苗，最高一级最窄，形成向内收的梯田轮廓。",
+      "descriptionEn": "A three-tier paddy terrace: each tier has a packed-earth retaining wall, a stone lip, shallow water and rows of seedlings; the highest tier is the narrowest, giving the stepped inward silhouette of a terraced field.",
+      "dimensions": {
+        "width": 12.0,
+        "height": 2.6,
+        "depth": 6.2
+      },
+      "proportions": "三级台地每级高差 0.78 m，台面进深约 2.07 m；前层最宽 12 m，向上每层收窄约 2.2 m。",
+      "triangles": 2000,
+      "file": "public/assets/whitebox/env_terrace.glb",
+      "anchor": "env-terrace",
+      "budgetLabel": "≤ 2000 tris",
+      "notes": "固定场景地标；不需要拼接。"
+    },
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_drying_rack",
+      "name": "晒谷架",
+      "en": "Grain Drying Rack",
+      "gameRole": "农事装饰",
+      "description": "两对木柱撑起三层横杆，横杆上倒挂五束稻穗；结构轻，适合放在田边。",
+      "descriptionEn": "Two pairs of timber posts supporting three rails, with five rice sheaves hung upside down from the rails; a light structure for the field edge.",
+      "dimensions": {
+        "width": 2.1,
+        "height": 1.6,
+        "depth": 0.9
+      },
+      "proportions": "横杆跨度 1.8 m，三层高度 0.55/0.9/1.25 m，稻穗垂到 0.15 m。",
+      "triangles": 900,
+      "file": "public/assets/whitebox/env_drying_rack.glb",
+      "anchor": "env-drying-rack",
+      "budgetLabel": "≤ 900 tris",
+      "notes": ""
+    },
+    {
+      "category": "environment",
+      "categoryLabel": "环境与建筑",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于地面几何中心。",
+      "collision": "不需要碰撞网格；游戏用 2D 圆形/矩形障碍体近似。",
+      "materials": [
+        "米白素胎",
+        "墨灰瓦木",
+        "暖土",
+        "淡青"
+      ],
+      "id": "env_scarecrow",
+      "name": "稻草人",
+      "en": "Scarecrow",
+      "gameRole": "田边地标",
+      "description": "木杆十字架撑起的稻草人，草帽、草裙、圆草头，脸上两点墨色眼睛。",
+      "descriptionEn": "A scarecrow on a wooden cross: straw hat, straw skirt, round straw head and two ink-dot eyes.",
+      "dimensions": {
+        "width": 1.2,
+        "height": 2.2,
+        "depth": 0.6
+      },
+      "proportions": "臂展 1.1 m，主体高 1.85 m，草帽直径 0.75 m。",
+      "triangles": 700,
+      "file": "public/assets/whitebox/env_scarecrow.glb",
+      "anchor": "env-scarecrow",
+      "budgetLabel": "≤ 700 tris",
+      "notes": ""
+    },
+    {
+      "category": "crop",
+      "categoryLabel": "作物",
+      "orientation": "径向对称，无固定正面；原点位于地面中心。",
+      "collision": "无需碰撞。",
+      "materials": [
+        "米白稻粒",
+        "淡青稻叶",
+        "暖土基部"
+      ],
+      "id": "crop_rice",
+      "name": "金穗稻（成熟态）",
+      "en": "Mature Golden Rice Clump",
+      "gameRole": "作物 wheat 的成熟白模；游戏用同一模型缩放表现 4 个生长阶段",
+      "description": "一丛 11 根稻秆，稻穗下垂、带细芒，基部有一圈泥土。整体略呈圆形，便于从任意角度观看。",
+      "descriptionEn": "A clump of eleven rice stalks with drooping, awned ears and a small soil base; roughly radial so it reads from any angle.",
+      "dimensions": {
+        "width": 0.9,
+        "height": 1.3,
+        "depth": 0.9
+      },
+      "proportions": "冠幅 0.9 m，最高稻穗 1.3 m；稻穗约占顶部 1/3 高度。",
+      "triangles": 900,
+      "notes": "游戏按 0.28/0.55/0.80/1.0 缩放表现生长阶段",
+      "file": "public/assets/whitebox/crop_rice.glb",
+      "anchor": "crop-rice",
+      "budgetLabel": "≤ 900 tris"
+    },
+    {
+      "category": "crop",
+      "categoryLabel": "作物",
+      "orientation": "径向对称，无固定正面；原点位于地面中心。",
+      "collision": "无需碰撞。",
+      "materials": [
+        "米白瓜身",
+        "淡青藤叶",
+        "浅金花"
+      ],
+      "id": "crop_pumpkin",
+      "name": "暖阳瓜（成熟态）",
+      "en": "Mature Sun Gourd",
+      "gameRole": "作物 pumpkin 的成熟白模；同一模型缩放表现生长阶段",
+      "description": "一条主藤、五片掌状叶，两只大小不一的瓜，瓜面有浅棱，旁边一朵小黄花。",
+      "descriptionEn": "A main vine with five palmate leaves, two gourds of different sizes with shallow ribs, and a small yellow flower.",
+      "dimensions": {
+        "width": 0.9,
+        "height": 1.1,
+        "depth": 0.9
+      },
+      "proportions": "两只瓜直径 0.54 m / 0.42 m，藤蔓高 0.72 m；整体不高于 1.1 m。",
+      "triangles": 900,
+      "notes": "游戏按 0.28/0.55/0.80/1.0 缩放表现生长阶段",
+      "file": "public/assets/whitebox/crop_pumpkin.glb",
+      "anchor": "crop-pumpkin",
+      "budgetLabel": "≤ 900 tris"
+    },
+    {
+      "category": "crop",
+      "categoryLabel": "作物",
+      "orientation": "径向对称，无固定正面；原点位于地面中心。",
+      "collision": "无需碰撞。",
+      "materials": [
+        "米白花瓣",
+        "淡青茎叶",
+        "浅金花蕊"
+      ],
+      "id": "crop_starflower",
+      "name": "星辉花（成熟态）",
+      "en": "Mature Starlight Bloom",
+      "gameRole": "作物 flower 的成熟白模；同一模型缩放表现生长阶段",
+      "description": "一根细茎、四片窄叶、七片米白花瓣，中心是一颗浅金发光花蕊，花下有一圈很淡的光环。",
+      "descriptionEn": "A slender stem with four narrow leaves, seven rice-white petals, a pale-gold glowing centre and a faint halo below the bloom.",
+      "dimensions": {
+        "width": 0.7,
+        "height": 1.4,
+        "depth": 0.7
+      },
+      "proportions": "花朵直径 0.55 m，花心离地约 0.95 m，光环直径 0.5 m。",
+      "triangles": 700,
+      "notes": "发光花蕊请用独立材质槽 Emissive，方便游戏替换",
+      "file": "public/assets/whitebox/crop_starflower.glb",
+      "anchor": "crop-starflower",
+      "budgetLabel": "≤ 700 tris"
+    },
+    {
+      "category": "tower",
+      "categoryLabel": "防御塔",
+      "orientation": "正面（面向敌人的一侧）朝 Blender -Y（Front 视图），导出后朝 Three.js +Z；原点位于塔基中心地面。",
+      "collision": "无碰撞；地块尺寸 2.2 × 2.2 m，模型最大外径不超过 2.2 m。",
+      "materials": [
+        "米白墙体",
+        "墨灰瓦顶",
+        "竹木",
+        "浅金发光件"
+      ],
+      "id": "tower_bamboo",
+      "name": "竹风望楼 Lv.1",
+      "en": "Bamboo Watchtower Lv.1",
+      "gameRole": "防御塔 arrow 的基础白模；Lv.2/3 复用同一模型缩放并加等级珠",
+      "description": "四根竹柱撑起的高台，台上小木屋、青瓦顶、朱砂布招和风向小旗；台沿有护栏。",
+      "descriptionEn": "A raised bamboo watchtower on four posts, with a small timber cabin, dark tiled roof, vermilion banner and wind vane; railing around the platform.",
+      "dimensions": {
+        "width": 2.15,
+        "height": 3.9,
+        "depth": 2.15
+      },
+      "proportions": "塔基直径 2.15 m，台面高 2.36 m，屋脊高 3.95 m；塔身略上收。",
+      "triangles": 2200,
+      "notes": "升级：整体放大 10%/20%，正面下方加 1/2 颗等级珠",
+      "file": "public/assets/whitebox/tower_bamboo.glb",
+      "anchor": "tower-bamboo",
+      "budgetLabel": "≤ 2200 tris"
+    },
+    {
+      "category": "tower",
+      "categoryLabel": "防御塔",
+      "orientation": "正面（面向敌人的一侧）朝 Blender -Y（Front 视图），导出后朝 Three.js +Z；原点位于塔基中心地面。",
+      "collision": "无碰撞；地块尺寸 2.2 × 2.2 m，模型最大外径不超过 2.2 m。",
+      "materials": [
+        "米白墙体",
+        "墨灰瓦顶",
+        "竹木",
+        "浅金发光件"
+      ],
+      "id": "tower_mortar",
+      "name": "石臼炮台 Lv.1",
+      "en": "Stone Mortar Tower Lv.1",
+      "gameRole": "防御塔 cannon 的基础白模；Lv.2/3 复用同一模型缩放并加等级珠",
+      "description": "方形石砌基座上一口石臼，臼中伸出竹木炮管，炮口朝正面；基座四角有石垛，顶上盖小青瓦顶。",
+      "descriptionEn": "A square stone base with a stone mortar, a bamboo-and-timber barrel project forward from the mortar, corner stone merlons and a small tiled roof.",
+      "dimensions": {
+        "width": 2.2,
+        "height": 2.6,
+        "depth": 2.2
+      },
+      "proportions": "基座高 1.55 m，炮管中心离地 1.9 m，屋顶高 2.6 m；炮口伸出正面 0.5 m。",
+      "triangles": 2000,
+      "notes": "升级：整体放大 8%/16%，正面下方加等级珠",
+      "file": "public/assets/whitebox/tower_mortar.glb",
+      "anchor": "tower-mortar",
+      "budgetLabel": "≤ 2000 tris"
+    },
+    {
+      "category": "tower",
+      "categoryLabel": "防御塔",
+      "orientation": "正面（面向敌人的一侧）朝 Blender -Y（Front 视图），导出后朝 Three.js +Z；原点位于塔基中心地面。",
+      "collision": "无碰撞；地块尺寸 2.2 × 2.2 m，模型最大外径不超过 2.2 m。",
+      "materials": [
+        "米白墙体",
+        "墨灰瓦顶",
+        "竹木",
+        "浅金发光件"
+      ],
+      "id": "tower_shrine",
+      "name": "社火祭坛 Lv.1",
+      "en": "Village Shrine Tower Lv.1",
+      "gameRole": "防御塔 star 的基础白模；Lv.2/3 复用同一模型缩放并加等级珠",
+      "description": "方形社坛：石台、四根白柱、中央神龛、青瓦小顶，龛顶悬浮一颗浅金谷灵与两道细光环。",
+      "descriptionEn": "A square village altar with a stone platform, four white pillars, a central shrine, a small tiled roof, and a pale-gold grain spirit with two thin halos floating above.",
+      "dimensions": {
+        "width": 2.2,
+        "height": 3.4,
+        "depth": 2.2
+      },
+      "proportions": "台基高 0.45 m，龛顶高 2.6 m，悬浮谷灵中心高 3.1 m；光环直径 1.3 m。",
+      "triangles": 2400,
+      "notes": "升级：整体放大 9%/18%，正面下方加等级珠；谷灵/光环需可独立旋转",
+      "file": "public/assets/whitebox/tower_shrine.glb",
+      "anchor": "tower-shrine",
+      "budgetLabel": "≤ 2400 tris"
+    },
+    {
+      "category": "guardian",
+      "categoryLabel": "乡勇",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后朝 Three.js +Z；原点位于双脚之间的地面中心。",
+      "collision": "无碰撞；占地格 2.2 × 2.2 m。",
+      "materials": [
+        "米白布衣",
+        "墨灰裤鞋",
+        "暖土肤色",
+        "草编斗笠",
+        "浅金等级珠"
+      ],
+      "id": "guard_bowman",
+      "name": "竹弓手",
+      "en": "Bamboo Archer",
+      "gameRole": "乡勇 bowman 的基础白模；等级缩放 + 等级珠",
+      "description": "戴斗笠、穿短打的猎户，左手持一张竹弓，背后斜插三支箭；站姿，双脚与肩同宽。",
+      "descriptionEn": "A hunter in a straw hat and short jacket, holding a bamboo bow in the left hand with three arrows slung across the back; standing with feet shoulder-width apart.",
+      "dimensions": {
+        "width": 0.8,
+        "height": 1.85,
+        "depth": 0.7
+      },
+      "proportions": "身高 1.85 m（含斗笠），肩宽 0.55 m，弓高 0.9 m。",
+      "triangles": 1400,
+      "file": "public/assets/whitebox/guard_bowman.glb",
+      "anchor": "guard-bowman",
+      "budgetLabel": "≤ 1400 tris",
+      "notes": ""
+    },
+    {
+      "category": "guardian",
+      "categoryLabel": "乡勇",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后朝 Three.js +Z；原点位于双脚之间的地面中心。",
+      "collision": "无碰撞；占地格 2.2 × 2.2 m。",
+      "materials": [
+        "米白布衣",
+        "墨灰裤鞋",
+        "暖土肤色",
+        "草编斗笠",
+        "浅金等级珠"
+      ],
+      "id": "guard_hoeman",
+      "name": "锄禾客",
+      "en": "Hoe Guard",
+      "gameRole": "乡勇 hoeman 的基础白模；等级缩放 + 等级珠",
+      "description": "短打庄稼汉，双手斜握一把长柄锄头，锄刃朝前下方，重心略前倾。",
+      "descriptionEn": "A farmhand in a short jacket gripping a long-handled hoe diagonally, blade forward and low, weight slightly forward.",
+      "dimensions": {
+        "width": 0.9,
+        "height": 1.8,
+        "depth": 0.8
+      },
+      "proportions": "身高 1.8 m，锄柄长 0.9 m，锄刃宽 0.3 m。",
+      "triangles": 1300,
+      "file": "public/assets/whitebox/guard_hoeman.glb",
+      "anchor": "guard-hoeman",
+      "budgetLabel": "≤ 1300 tris",
+      "notes": ""
+    },
+    {
+      "category": "guardian",
+      "categoryLabel": "乡勇",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后朝 Three.js +Z；原点位于双脚之间的地面中心。",
+      "collision": "无碰撞；占地格 2.2 × 2.2 m。",
+      "materials": [
+        "米白布衣",
+        "墨灰裤鞋",
+        "暖土肤色",
+        "草编斗笠",
+        "浅金等级珠"
+      ],
+      "id": "guard_fieldhand",
+      "name": "田倌",
+      "en": "Field Keeper",
+      "gameRole": "乡勇 fieldhand 的基础白模；等级缩放 + 等级珠",
+      "description": "背微驼的老农，戴斗笠，一手拿竹耙、一手提一只装秧苗的竹篮，脚边有泥。",
+      "descriptionEn": "A slightly stooped old farmer in a straw hat, one hand holding a bamboo rake, the other carrying a basket of seedlings, with a little mud at his feet.",
+      "dimensions": {
+        "width": 0.9,
+        "height": 1.75,
+        "depth": 0.8
+      },
+      "proportions": "身高 1.75 m，竹耙高 0.95 m，秧篮直径 0.35 m。",
+      "triangles": 1300,
+      "file": "public/assets/whitebox/guard_fieldhand.glb",
+      "anchor": "guard-fieldhand",
+      "budgetLabel": "≤ 1300 tris",
+      "notes": ""
+    },
+    {
+      "category": "guardian",
+      "categoryLabel": "乡勇",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后朝 Three.js +Z；原点位于双脚之间的地面中心。",
+      "collision": "无碰撞；占地格 2.2 × 2.2 m。",
+      "materials": [
+        "米白布衣",
+        "墨灰裤鞋",
+        "暖土肤色",
+        "草编斗笠",
+        "浅金等级珠"
+      ],
+      "id": "guard_herbalist",
+      "name": "采药人",
+      "en": "Herbalist",
+      "gameRole": "乡勇 herbalist 的基础白模；等级缩放 + 等级珠",
+      "description": "背药篓、挎葫芦的山民，药篓里插五束草药，一手捏一株草药。",
+      "descriptionEn": "A mountain herbalist with a herb basket on the back and a gourd at the waist; five herb bundles stick out of the basket and one herb is held in a hand.",
+      "dimensions": {
+        "width": 0.85,
+        "height": 1.8,
+        "depth": 1.0
+      },
+      "proportions": "身高 1.8 m，药篓高 0.5 m，葫芦高 0.25 m；纵深含药篓约 1.0 m。",
+      "triangles": 1500,
+      "file": "public/assets/whitebox/guard_herbalist.glb",
+      "anchor": "guard-herbalist",
+      "budgetLabel": "≤ 1500 tris",
+      "notes": ""
+    },
+    {
+      "category": "guardian",
+      "categoryLabel": "乡勇",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后朝 Three.js +Z；原点位于双脚之间的地面中心。",
+      "collision": "无碰撞；占地格 2.2 × 2.2 m。",
+      "materials": [
+        "米白布衣",
+        "墨灰裤鞋",
+        "暖土肤色",
+        "草编斗笠",
+        "浅金等级珠"
+      ],
+      "id": "guard_mason",
+      "name": "石匠",
+      "en": "Stone Mason",
+      "gameRole": "乡勇 mason 的基础白模；等级缩放 + 等级珠",
+      "description": "系皮围裙的石匠，右手提木锤、左手握凿子，脚边一块待凿的石料。",
+      "descriptionEn": "A stone mason in a leather apron, holding a wooden mallet in the right hand and a chisel in the left, with a block of stone at his feet.",
+      "dimensions": {
+        "width": 0.9,
+        "height": 1.85,
+        "depth": 0.8
+      },
+      "proportions": "身高 1.85 m，木锤长 0.5 m，脚边石料 0.24 m 见方。",
+      "triangles": 1500,
+      "file": "public/assets/whitebox/guard_mason.glb",
+      "anchor": "guard-mason",
+      "budgetLabel": "≤ 1500 tris",
+      "notes": ""
+    },
+    {
+      "category": "guardian",
+      "categoryLabel": "乡勇",
+      "orientation": "正面朝 Blender -Y（Front 视图），导出后朝 Three.js +Z；原点位于双脚之间的地面中心。",
+      "collision": "无碰撞；占地格 2.2 × 2.2 m。",
+      "materials": [
+        "米白布衣",
+        "墨灰裤鞋",
+        "暖土肤色",
+        "草编斗笠",
+        "浅金等级珠"
+      ],
+      "id": "guard_ricespirit",
+      "name": "稻灵",
+      "en": "Rice Spirit",
+      "gameRole": "乡勇 ricespirit 的基础白模；等级缩放 + 等级珠",
+      "description": "没有脚的稻穗精灵：米白长袍下摆散成草叶，头顶一圈七束小稻穗，身周一道细光环。光环需可独立旋转。",
+      "descriptionEn": "A footless rice spirit: rice-white robe that frays into grass blades at the hem, a crown of seven small rice ears, and a thin halo around the body. The halo must be a separate child for rotation.",
+      "dimensions": {
+        "width": 0.9,
+        "height": 1.8,
+        "depth": 0.9
+      },
+      "proportions": "身高 1.8 m（含冠），光环直径 0.92 m，袍摆直径 0.7 m。",
+      "triangles": 1800,
+      "notes": "子对象命名 Halo 用于旋转",
+      "file": "public/assets/whitebox/guard_ricespirit.glb",
+      "anchor": "guard-ricespirit",
+      "budgetLabel": "≤ 1800 tris"
+    },
+    {
+      "category": "enemy",
+      "categoryLabel": "野兽",
+      "orientation": "头朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于四足之间的地面中心。",
+      "collision": "无碰撞；游戏沿路径移动并做 2D 近似。",
+      "materials": [
+        "米白/墨灰皮毛",
+        "暖土蹄角",
+        "朱砂或浅金眼睛"
+      ],
+      "id": "enemy_fox",
+      "name": "赤狐",
+      "en": "Ember Fox",
+      "gameRole": "敌人 fox 的基础白模",
+      "description": "体型轻巧的狐狸：尖耳、长吻、蓬松大尾，四肢细长，眼睛两点朱砂。",
+      "descriptionEn": "A light-built fox with pointed ears, long muzzle, a big bushy tail, slender legs and two vermilion eyes.",
+      "dimensions": {
+        "width": 1.0,
+        "height": 0.9,
+        "depth": 1.8
+      },
+      "proportions": "肩高 0.55 m，体长 1.2 m，尾长 0.65 m；整体高不超过 0.9 m。",
+      "triangles": 1100,
+      "file": "public/assets/whitebox/enemy_fox.glb",
+      "anchor": "enemy-fox",
+      "budgetLabel": "≤ 1100 tris",
+      "notes": ""
+    },
+    {
+      "category": "enemy",
+      "categoryLabel": "野兽",
+      "orientation": "头朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于四足之间的地面中心。",
+      "collision": "无碰撞；游戏沿路径移动并做 2D 近似。",
+      "materials": [
+        "米白/墨灰皮毛",
+        "暖土蹄角",
+        "朱砂或浅金眼睛"
+      ],
+      "id": "enemy_wolf",
+      "name": "灰狼",
+      "en": "Grey Wolf",
+      "gameRole": "敌人 wolf 的基础白模",
+      "description": "比狐狸更高大的狼：竖耳、窄胸、长尾下垂，四肢肌肉感更强，眼睛浅金。",
+      "descriptionEn": "A taller wolf with erect ears, a narrow chest, a long lowered tail, stronger legs and pale-gold eyes.",
+      "dimensions": {
+        "width": 1.2,
+        "height": 1.1,
+        "depth": 2.1
+      },
+      "proportions": "肩高 0.72 m，体长 1.45 m，尾长 0.55 m。",
+      "triangles": 1300,
+      "file": "public/assets/whitebox/enemy_wolf.glb",
+      "anchor": "enemy-wolf",
+      "budgetLabel": "≤ 1300 tris",
+      "notes": ""
+    },
+    {
+      "category": "enemy",
+      "categoryLabel": "野兽",
+      "orientation": "头朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于四足之间的地面中心。",
+      "collision": "无碰撞；游戏沿路径移动并做 2D 近似。",
+      "materials": [
+        "米白/墨灰皮毛",
+        "暖土蹄角",
+        "朱砂或浅金眼睛"
+      ],
+      "id": "enemy_boar",
+      "name": "荒角野猪",
+      "en": "Wild Boar",
+      "gameRole": "敌人 bull 的基础白模",
+      "description": "粗壮的野猪：背部隆起、短颈、獠牙上翘、耳朵小而尖，四肢短粗。",
+      "descriptionEn": "A stocky wild boar with a humped back, short neck, upturned tusks, small pointed ears and short thick legs.",
+      "dimensions": {
+        "width": 1.6,
+        "height": 1.4,
+        "depth": 2.4
+      },
+      "proportions": "肩高 0.95 m，体长 1.7 m，獠牙长 0.3 m。",
+      "triangles": 1500,
+      "file": "public/assets/whitebox/enemy_boar.glb",
+      "anchor": "enemy-boar",
+      "budgetLabel": "≤ 1500 tris",
+      "notes": ""
+    },
+    {
+      "category": "enemy",
+      "categoryLabel": "野兽",
+      "orientation": "头朝 Blender -Y（Front 视图），导出后在 Three.js 中朝 +Z；原点位于四足之间的地面中心。",
+      "collision": "无碰撞；游戏沿路径移动并做 2D 近似。",
+      "materials": [
+        "米白/墨灰皮毛",
+        "暖土蹄角",
+        "朱砂或浅金眼睛"
+      ],
+      "id": "enemy_stag",
+      "name": "白鹿王（Boss）",
+      "en": "White Stag Boss",
+      "gameRole": "敌人 stag 的基础白模；Boss 光环由游戏另加",
+      "description": "高大的白鹿王：分叉鹿角、修长四肢、高抬头颈，通体米白，眼睛浅金；脚下有游戏叠加的光环。",
+      "descriptionEn": "A tall white stag king with branching antlers, long legs, a raised head and neck, rice-white body and pale-gold eyes; the game adds a boss aura at its feet.",
+      "dimensions": {
+        "width": 2.0,
+        "height": 2.4,
+        "depth": 2.8
+      },
+      "proportions": "肩高 1.5 m，鹿角尖高 2.4 m，体长 2.0 m。",
+      "triangles": 1800,
+      "file": "public/assets/whitebox/enemy_stag.glb",
+      "anchor": "enemy-stag",
+      "budgetLabel": "≤ 1800 tris",
+      "notes": ""
+    },
+    {
+      "category": "player",
+      "categoryLabel": "玩家",
+      "orientation": "角色正脸朝 Blender +Y（Back 视图），导出后在 Three.js 中朝 -Z；原点位于双脚之间的地面中心。",
+      "collision": "无碰撞；仅视觉。",
+      "materials": [
+        "米白上衣",
+        "墨灰长裤",
+        "暖土肤色",
+        "草编斗笠"
+      ],
+      "id": "player_farmer",
+      "name": "守望者（第三人称）",
+      "en": "First-Person Farmer Avatar",
+      "gameRole": "俯瞰视角下可见的玩家角色",
+      "description": "戴斗笠、穿米白短衫与墨灰裤的年轻守望者，背后可加一顶小斗篷；模型需分出头、躯干、双臂、双腿四组，以便走路摆动。",
+      "descriptionEn": "A young farmer in a straw hat, rice-white jacket and ink-grey trousers, with an optional short cape; head, torso, two arms and two legs must be separate groups for walking animation.",
+      "dimensions": {
+        "width": 0.7,
+        "height": 1.9,
+        "depth": 0.5
+      },
+      "proportions": "身高 1.9 m（含斗笠），肩宽 0.54 m，头身比约 1:6。",
+      "triangles": 1400,
+      "file": "public/assets/whitebox/player_farmer.glb",
+      "anchor": "player-farmer",
+      "budgetLabel": "≤ 1400 tris",
+      "notes": ""
+    },
+    {
+      "category": "player",
+      "categoryLabel": "玩家",
+      "orientation": "按第一人称视图建模：锄刃朝 Blender -Y（画面深处），木柄从右下向左上延伸；原点位于握把中心。",
+      "collision": "无碰撞；仅视觉。",
+      "materials": [
+        "木柄",
+        "墨灰铁刃",
+        "暖土肤色"
+      ],
+      "id": "player_hoe",
+      "name": "第一人称锄头",
+      "en": "First-Person Hoe Viewmodel",
+      "gameRole": "第一人称手持道具",
+      "description": "一把短柄锄：木柄、墨灰铁锄刃、握柄处一只暖土色手。只做右侧近景，不需要完整角色。",
+      "descriptionEn": "A short-handled hoe: wooden shaft, ink-grey iron blade, and a warm-earth hand gripping the shaft. Only the right-side viewmodel is needed; no full character.",
+      "dimensions": {
+        "width": 0.4,
+        "height": 1.0,
+        "depth": 0.7
+      },
+      "proportions": "柄长 0.92 m，刃宽 0.26 m；握把位于柄的 1/3 处。",
+      "triangles": 300,
+      "file": "public/assets/whitebox/player_hoe.glb",
+      "anchor": "player-hoe",
+      "budgetLabel": "≤ 300 tris",
+      "notes": ""
+    }
+  ]
+}
