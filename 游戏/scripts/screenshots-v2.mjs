@@ -212,7 +212,8 @@ try {
       api.build(18, 'arrow');
       api.build(19, 'arrow');
       api.selectTowerAt(18);
-      api.setCamera([-2.0, 16.0, 14.0], [-4.5, 0.0, 0.5]);
+      api.facePlot(18, 8.0);
+      api.setLook(-0.35, -0.15);
     });
     await page.waitForTimeout(5200);
     await page.screenshot({ path: path.join(out, 'after-v2-merge.png') });
