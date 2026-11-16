@@ -87,6 +87,13 @@
 
       <div id="blessing-bar" class="blessing-bar" hidden aria-label="本局季令"></div>
 
+      <div id="recruit-bar" class="recruit-bar" hidden aria-label="乡约亭招募">
+        <div class="recruit-title"><span>乡约亭</span><small>RECRUIT</small></div>
+        <button class="recruit-btn" id="btn-recruit" type="button" title="花金币随机招募三名乡勇 (R)">招募 · 12</button>
+        <div class="recruit-bench" id="recruit-bench" aria-live="polite"></div>
+        <span class="recruit-hint" id="recruit-hint">招募三人，安置到空地上</span>
+      </div>
+
       <div id="banner" class="banner" aria-live="polite"></div>
 
       <div id="bottom-bar" hidden>
@@ -96,11 +103,11 @@
             <div class="tool-row">
               <button class="tool-card" type="button" data-crop="wheat" aria-pressed="false">
                 <span class="tool-icon">🌾</span>
-                <span class="tool-copy"><b>金穗麦</b><small><i>🪙</i> 6 · 9s</small></span>
+                <span class="tool-copy"><b>金穗稻</b><small><i>🪙</i> 6 · 9s</small></span>
               </button>
               <button class="tool-card" type="button" data-crop="pumpkin" aria-pressed="false">
                 <span class="tool-icon">🎃</span>
-                <span class="tool-copy"><b>暖阳南瓜</b><small><i>🪙</i> 18 · 22s</small></span>
+                <span class="tool-copy"><b>暖阳瓜</b><small><i>🪙</i> 18 · 22s</small></span>
               </button>
               <button class="tool-card" type="button" data-crop="flower" aria-pressed="false">
                 <span class="tool-icon">✨</span>
@@ -114,15 +121,15 @@
             <div class="tool-row">
               <button class="tool-card" type="button" data-tower="arrow" aria-pressed="false">
                 <span class="tool-icon">🏹</span>
-                <span class="tool-copy"><b>风语箭塔</b><small><i>🪙</i> 42</small></span>
+                <span class="tool-copy"><b>竹风望楼</b><small><i>🪙</i> 42</small></span>
               </button>
               <button class="tool-card" type="button" data-tower="cannon" aria-pressed="false">
                 <span class="tool-icon">💥</span>
-                <span class="tool-copy"><b>南瓜炮台</b><small><i>🪙</i> 88</small></span>
+                <span class="tool-copy"><b>石臼炮台</b><small><i>🪙</i> 88</small></span>
               </button>
               <button class="tool-card" type="button" data-tower="star" aria-pressed="false">
                 <span class="tool-icon">🔮</span>
-                <span class="tool-copy"><b>星辉圣坛</b><small><i>✦</i> 2 · <i>🪙</i> 118</small></span>
+                <span class="tool-copy"><b>社火祭坛</b><small><i>✦</i> 2 · <i>🪙</i> 118</small></span>
               </button>
             </div>
           </section>
@@ -149,7 +156,7 @@
         <div class="inspector-head">
           <span class="inspector-icon" id="inspect-icon">🏹</span>
           <div>
-            <h2 id="inspect-name">风语箭塔</h2>
+            <h2 id="inspect-name">竹风望楼</h2>
             <p id="inspect-sub">Windwatch · Lv.1</p>
           </div>
         </div>
@@ -172,28 +179,28 @@
           <h1>穗守</h1>
           <p>正在开垦山野、唤醒守望者…</p>
           <div class="loading-track"><i id="loading-fill"></i></div>
-          <span class="loading-note" id="loading-note">载入低多边形世界</span>
-          <span class="loading-tip">提示：塔基会占用地块，拆除后地块恢复原状。</span>
+          <span class="loading-note" id="loading-note">铺开青瓦白墙的田园</span>
+          <span class="loading-tip">提示：白模占位物在 docs/whitebox-blender-prompts.md 里逐项配有 Blender 提示词。</span>
         </div>
       </section>
 
       <section id="menu-screen" class="screen menu-screen" hidden>
         <div class="menu-scrim"></div>
         <div class="menu-content">
-          <div class="eyebrow"><span></span>低多边形 · 单机 · 无需登录<span></span></div>
+          <div class="eyebrow"><span></span>中国田园 · 白模占位 · 单机<span></span></div>
           <h1 class="game-title">穗守</h1>
           <div class="game-title-en">HARVEST &amp; HOLD</div>
-          <p class="tagline">种下希望，筑起守望。<br />守住农田，也守住最后一口粮。</p>
+          <p class="tagline">青瓦白墙，梯田稻浪。<br />种下希望，也守住最后一口粮。</p>
           <div class="menu-modes">
             <button class="mode-card mode-classic" id="btn-start" type="button">
               <span class="mode-tag">经典</span>
               <b>守成</b>
-              <small>6 波 · 20 命 · 熟悉第一人称农作</small>
+              <small>6 波 · 20 命 · 招募乡勇 · 第一人称农作</small>
             </button>
             <button class="mode-card mode-versus" id="btn-versus" type="button">
               <span class="mode-tag">新季</span>
               <b>对垒</b>
-              <small>8 波 · 12 命 · 三选一季令 · 行商 · 合成</small>
+              <small>8 波 · 12 命 · 招募放置 · 季令 · 行商 · 合成</small>
             </button>
           </div>
           <div class="menu-actions">
@@ -201,8 +208,8 @@
           </div>
           <ul class="menu-points">
             <li><i>01</i>第一人称走进田野：开垦荒地、播种收获、亲手筑塔</li>
-            <li><i>02</i>对垒季：波间三选一季令，行商处补给，相邻同阶塔可合成</li>
-            <li><i>03</i><b>WASD</b> 移动 · 鼠标看 · <b>E</b> 近处交互 · <b>V</b> 俯瞰布局</li>
+            <li><i>02</i>乡约亭随机招募：三人一签，选空地安置，相邻同阶可合成</li>
+            <li><i>03</i><b>WASD</b> 移动 · 鼠标看 · <b>E</b> 交互 · <b>R</b> 招募 · <b>V</b> 俯瞰</li>
           </ul>
           <div class="menu-meta">
             <span id="menu-best">最佳纪录：—</span>
@@ -211,7 +218,7 @@
             <span class="dot">·</span>
             <span>24 块可开垦地</span>
           </div>
-          <div class="menu-credit">CC0 / 可商用素材 · Three.js · 本地运行</div>
+          <div class="menu-credit">100% 程序化白模 · 零外部美术依赖 · Three.js · 本地运行</div>
         </div>
         <div class="menu-side-note">FARM · FEED · DEFEND</div>
       </section>
@@ -233,13 +240,14 @@
                 <li><b>开垦</b>：走到荒地旁按 <kbd>E</kbd>，花金币开垦成农田；一块比一块贵。</li>
                 <li><b>播种 / 收获</b>：选择作物后走到农田旁按 <kbd>E</kbd> 播种；成熟后再按 <kbd>E</kbd> 收获。</li>
                 <li><b>筑塔</b>：选择防御塔，走到荒地或空农田旁按 <kbd>E</kbd> 建塔；地块变成塔基，不能再种作物。</li>
+                <li><b>招募</b>：点底部的「乡约亭」或按 <kbd>R</kbd>，花金币随机抽三名乡勇；再选一位走到空地按 <kbd>E</kbd> 安置。待命席上的乡勇可以免费劝返，但金币不退。</li>
               </ol>
             </section>
             <section>
               <h3>资源与取舍</h3>
               <ul class="help-list">
                 <li><span class="swatch gold"></span><b>金币</b>：开垦、播种、建塔、修复焦土。</li>
-                <li><span class="swatch star"></span><b>星辉</b>：星辉花产出，建造/升级星辉圣坛与塔升级需要。</li>
+                <li><span class="swatch star"></span><b>星辉</b>：星辉花产出，建造/升级社火祭坛与塔升级需要。</li>
                 <li><span class="swatch life"></span><b>生命</b>：漏怪扣生命并烧毁作物，降至 0 即失败。</li>
               </ul>
             </section>
@@ -248,7 +256,8 @@
               <ul class="help-list">
                 <li><b>季令</b>：对垒模式第 1–7 波清除后，从三项季令中选一项，整局生效；栏位在屏幕左侧。</li>
                 <li><b>行商</b>：第 2、4、6 波后出现，用金币买星辉、生命、地契、精铁或种子袋；可花金币刷新。</li>
-                <li><b>合成</b>：两座<strong>相邻</strong>且同类型、同等级的塔可以合成高一阶塔，省下升级费，但会空出一块地。</li>
+                <li><b>合成</b>：两座<strong>相邻</strong>且同类型、同等级的塔可以合成高一阶塔；两位相邻同类型同阶的乡勇也能合成。</li>
+                <li><b>乡勇光环</b>：田倌加速相邻农田，石匠增强相邻塔，采药人增加相邻塔射程，稻灵增强相邻乡勇。站位就是 build。</li>
                 <li><b>对垒</b>：对手也在守田。先失去全部生命的一方落败；八波后若都活着，生命多者胜，同命比收获金币。</li>
               </ul>
             </section>
@@ -258,21 +267,23 @@
                 <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动 · 鼠标视角 · <kbd>Space</kbd> 跳跃</li>
                 <li><kbd>E</kbd> 交互 · <kbd>V</kbd> 第一人称 / 俯瞰</li>
                 <li><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 选择作物 · <kbd>4</kbd><kbd>5</kbd><kbd>6</kbd> 选择防御塔</li>
+                <li><kbd>R</kbd> 乡约亭招募 · <kbd>7</kbd><kbd>8</kbd><kbd>9</kbd> 选待命乡勇</li>
                 <li><kbd>Enter</kbd> 提前迎战 · <kbd>T</kbd> 双倍速 · <kbd>P</kbd>/<kbd>Esc</kbd> 暂停 · <kbd>M</kbd> 静音</li>
               </ul>
             </section>
             <section>
               <h3>野战提示</h3>
               <ul class="help-list">
-                <li>先把靠近营地的 3–4 块地开垦种麦，再起第一座箭塔。</li>
+                <li>先把靠近营地的 3–4 块地开垦种稻，再起第一座望楼。</li>
                 <li>南、北、西三面的外圈地块靠近石径，适合建塔；内圈地块更适合安心种田。</li>
                 <li>塔建在农田上会把农田变成塔基；拆除后农田会恢复，但开垦费不会退还。</li>
+                <li>乡勇放在塔或农田旁边才有光环；放在石径拐角能覆盖更长的路。</li>
                 <li>焦土可以花 {{repairCost}} 金币修复；新田可逐步开垦。</li>
               </ul>
             </section>
           </div>
           <div class="modal-foot">
-            <span>所有外部美术资源均为 CC0 或明确允许商用与再分发，详见仓库 CREDITS.md。</span>
+            <span>v3 使用程序化中国田园白模，不加载外部 GLB；每件占位物对应 docs/whitebox-blender-prompts.md 中的一条 Blender 提示词。</span>
             <button class="btn-primary btn-small" data-close="help" type="button">继续守望</button>
           </div>
         </div>

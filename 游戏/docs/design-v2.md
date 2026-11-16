@@ -4,6 +4,7 @@
 > 基线：PR #6 `8e3129f`（第一人称 + 24 块荒地 + 选地建塔）
 > 范围：在现有单机 3D「种田 × 塔防」上，补齐 PvP、Roguelike 三选一、合成、经济、商店、格子扩张的完整设计与可玩实现
 > 关联调研：[`research-zhaoyun-adou.md`](research-zhaoyun-adou.md)
+> **后续版本**：v3 中国田园白模与随机招募见 [`design-v3-pastoral.md`](design-v3-pastoral.md)；本文的季令、行商、合成、格子扩张与对垒规则仍是 v3 的基础。
 
 ---
 

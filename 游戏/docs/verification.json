@@ -1,5 +1,5 @@
 {
-  "startedAt": "2026-11-16T10:54:06.776Z",
+  "startedAt": "2026-11-16T12:21:50.693Z",
   "environment": {
     "platform": "darwin",
     "arch": "arm64",
@@ -16,12 +16,13 @@
   "build": {
     "ok": true,
     "exitCode": 0,
-    "durationMs": 389,
-    "outputTail": "computing gzip size...\ndist/index.html                  18.70 kB │ gzip:   5.59 kB\ndist/assets/index-Djn3gnt7.css   37.86 kB │ gzip:   8.72 kB\ndist/assets/index-BFN4XW2C.js   842.96 kB │ gzip: 222.54 kB\n\n✓ built in 134ms\n\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
+    "durationMs": 298,
+    "outputTail": "computing gzip size...\ndist/index.html                  19.97 kB │ gzip:   6.05 kB\ndist/assets/index-BwWE4tU9.css   44.23 kB │ gzip:   9.95 kB\ndist/assets/index-Sxyto6j9.js   821.18 kB │ gzip: 217.54 kB\n\n✓ built in 98ms\n\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
   },
   "assets": {
-    "loaded": 69,
-    "total": 69,
+    "mode": "whitebox",
+    "loaded": 0,
+    "total": 0,
     "errors": []
   },
   "browser": "chromium 158.0.8127.18 (headless, metal=true)",
@@ -42,9 +43,14 @@
       "details": "chromium 158.0.8127.18 (headless, metal=true)"
     },
     {
-      "name": "all external models load from static assets",
+      "name": "the build is a dependency-free white-box art build",
       "ok": true,
-      "details": "69/69 loaded, 0 errors"
+      "details": "whitebox mode, 0 errors"
+    },
+    {
+      "name": "no external GLB is requested at runtime",
+      "ok": true,
+      "details": "0 GLB requests"
     },
     {
       "name": "start screen and live 3D scene render",
@@ -59,7 +65,7 @@
     {
       "name": "start button keeps a visible gold background",
       "ok": true,
-      "details": "{\"backgroundColor\":\"rgb(243, 196, 85)\",\"backgroundImage\":\"linear-gradient(155deg, rgb(255, 217, 120), rgb(243, 196, 85) 55%, rgb(217, 169, 61))\",\"color\":\"rgb(27, 42, 31)\",\"appearance\":\"none\"}"
+      "details": "{\"backgroundColor\":\"rgb(217, 185, 120)\",\"backgroundImage\":\"linear-gradient(155deg, rgb(255, 217, 120), rgb(217, 185, 120) 55%, rgb(217, 169, 61))\",\"color\":\"rgb(31, 37, 35)\",\"appearance\":\"none\"}"
     },
     {
       "name": "starting economy is correct",
@@ -202,6 +208,71 @@
       "details": "plots wild"
     },
     {
+      "name": "recruit spends gold and draws a random three-card bench",
+      "ok": true,
+      "details": "fieldhand, hoeman, ricespirit · gold 1022 → 1010 · cost 12"
+    },
+    {
+      "name": "the recruit bar shows three cards and the next batch costs more",
+      "ok": true,
+      "details": "招募 · 16"
+    },
+    {
+      "name": "a selected recruit is placed on the chosen empty plot and occupies it",
+      "ok": true,
+      "details": "{\"guardian\":{\"id\":\"hoeman\",\"plot\":20,\"level\":1,\"damage\":22,\"range\":2.2,\"aura\":null,\"auraBonus\":\"\"},\"plot\":{\"index\":20,\"state\":\"guardian\",\"underlying\":\"wild\",\"scorched\":false,\"reclaim\":null,\"crop\":null},\"bench\":2}"
+    },
+    {
+      "name": "a guard post cannot be planted with crops",
+      "ok": true,
+      "details": "plant returned false"
+    },
+    {
+      "name": "a placed guardian can be inspected from its plot",
+      "ok": true,
+      "details": "prompt “查看 锄禾客 Lv.1”"
+    },
+    {
+      "name": "two adjacent same-type guards expose a merge action",
+      "ok": true,
+      "details": "合成 Lv.2"
+    },
+    {
+      "name": "merging consumes the adjacent guard and raises the survivor to Lv.2",
+      "ok": true,
+      "details": "{\"mergedGuard\":{\"id\":\"mason\",\"plot\":6,\"level\":2,\"damage\":15,\"range\":3.7,\"aura\":\"towerDamage\",\"auraBonus\":\"相邻防御塔伤害 +12%（Lv.2）\"},\"plot7\":\"wild\"}"
+    },
+    {
+      "name": "dismissing a guard restores its plot without a gold refund",
+      "ok": true,
+      "details": "plot 6 wild"
+    },
+    {
+      "name": "a field-hand’s adjacency aura speeds up the neighbouring crop",
+      "ok": true,
+      "details": "near 59% vs far 50%"
+    },
+    {
+      "name": "the guard aura is reported in the debug state",
+      "ok": true,
+      "details": "相邻农田生长速度 +18%（Lv.1）"
+    },
+    {
+      "name": "recruited guards deal damage in a live wave",
+      "ok": true,
+      "details": "3 kills, wave 1"
+    },
+    {
+      "name": "each recruit batch raises the next cost",
+      "ok": true,
+      "details": "draws 2, next cost 20"
+    },
+    {
+      "name": "an unplaced recruit can be dismissed for free",
+      "ok": true,
+      "details": "bench 3 → 2"
+    },
+    {
       "name": "pause overlay pauses the run",
       "ok": true,
       "details": "paused"
@@ -244,7 +315,7 @@
     {
       "name": "the winning run reclaimed land, farmed it and built towers on plots",
       "ok": true,
-      "details": "10 farmland, 14 towers, 3008 harvested gold"
+      "details": "10 farmland, 14 towers, 2960 harvested gold"
     },
     {
       "name": "the winning run upgraded towers",
@@ -254,7 +325,7 @@
     {
       "name": "a busy first-person farm scene renders near 60 fps",
       "ok": true,
-      "details": "60.1 fps average, p95 18.1 ms, 146 draw calls, 264480 triangles"
+      "details": "60.1 fps average, p95 18.6 ms, 198 draw calls, 104320 triangles"
     },
     {
       "name": "versus mode starts with eight waves, twelve lives and a rival",
@@ -264,7 +335,7 @@
     {
       "name": "the duel HUD names the rival and shows both life totals",
       "ok": true,
-      "details": "对垒\n你 12\n:\n12 石桥·小满\n季风客 · 已守 0 波"
+      "details": "对垒\n你 12\n:\n12 石桥·小满\n守田人 · 已守 0 波"
     },
     {
       "name": "two adjacent same-level towers expose a merge action",
@@ -279,37 +350,37 @@
     {
       "name": "clearing a versus wave opens the three-choice blessing screen",
       "ok": true,
-      "details": "blessing, offers gale,starlight,rain"
+      "details": "blessing, offers bulwark,gale,rain"
     },
     {
       "name": "choosing a blessing adds a stack and resumes the run",
       "ok": true,
-      "details": "gale ×1, phase playing"
+      "details": "bulwark ×1, phase playing"
     },
     {
       "name": "the blessing bar shows the chosen season",
       "ok": true,
-      "details": "🍃\n穿林疾风\n×1"
+      "details": "🛡\n坚壁清野\n×1"
     },
     {
       "name": "the merchant visits after the second versus wave",
       "ok": true,
-      "details": "shop, offers lifeCharm,deed,starVial"
+      "details": "shop, offers starVial,lifeCharm,seedPouch"
     },
     {
       "name": "the rival takes leaks as the duel progresses",
       "ok": true,
-      "details": "rival 11/12"
+      "details": "rival 10/12"
     },
     {
       "name": "the merchant limits a visit to two purchases",
       "ok": true,
-      "details": "purchases 2, gold 1316"
+      "details": "purchases 2, gold 1333"
     },
     {
       "name": "rerolling the merchant costs gold and refreshes the offers",
       "ok": true,
-      "details": "gold 1316 → 1301, rerolls 1"
+      "details": "gold 1333 → 1318, rerolls 1"
     },
     {
       "name": "closing the merchant resumes the run",
@@ -319,7 +390,7 @@
     {
       "name": "a versus run reaches a win or loss after the eight-wave state machine",
       "ok": true,
-      "details": "{\"phase\":\"victory\",\"wave\":8,\"lives\":7,\"maxLives\":14,\"rivalLives\":0,\"blessings\":7,\"merges\":5,\"totalWaves\":8}"
+      "details": "{\"phase\":\"victory\",\"wave\":8,\"lives\":6,\"maxLives\":14,\"rivalLives\":1,\"blessings\":7,\"merges\":5,\"totalWaves\":8}"
     },
     {
       "name": "the versus victory end screen reports the duel outcome",
@@ -344,7 +415,7 @@
     {
       "name": "mobile HUD, joystick and interact button fit without overflow",
       "ok": true,
-      "details": "{\"documentWidth\":390,\"viewportWidth\":390,\"utilityVisible\":true,\"joystick\":{\"x\":20,\"y\":550,\"w\":118,\"h\":118,\"bottom\":668,\"right\":138},\"interact\":{\"x\":284,\"y\":562,\"w\":86,\"h\":86,\"bottom\":648,\"right\":370},\"touchVisible\":true,\"hudOverlap\":false}"
+      "details": "{\"documentWidth\":390,\"viewportWidth\":390,\"utilityVisible\":true,\"joystick\":{\"x\":20,\"y\":550,\"w\":118,\"h\":118,\"bottom\":668,\"right\":138},\"interact\":{\"x\":284,\"y\":562,\"w\":86,\"h\":86,\"bottom\":648,\"right\":370},\"touchVisible\":true,\"recruitVisible\":true,\"recruit\":{\"x\":6,\"y\":499.2688293457031,\"w\":378,\"h\":44.999969482421875,\"bottom\":544.268798828125,\"right\":384},\"hudOverlap\":false}"
     },
     {
       "name": "the mobile interact button is enabled next to a plot",
@@ -354,7 +425,7 @@
     {
       "name": "tapping the mobile interact button starts reclamation",
       "ok": true,
-      "details": "reclaim progress 0.22"
+      "details": "reclaim progress 0.23"
     },
     {
       "name": "mobile versus HUD fits without horizontal overflow",
@@ -364,7 +435,22 @@
     {
       "name": "mobile blessing modal stacks three readable cards without overflow",
       "ok": true,
-      "details": "{\"phase\":\"blessing\",\"cards\":3,\"modal\":{\"x\":12.038253784179688,\"y\":79.25924682617188,\"width\":365.9234619140625,\"height\":685.544189453125,\"top\":79.25924682617188,\"right\":377.9617156982422,\"bottom\":764.8034362792969,\"left\":12.038253784179688},\"documentWidth\":390,\"viewportWidth\":390}"
+      "details": "{\"phase\":\"blessing\",\"cards\":3,\"modal\":{\"x\":12.019271850585938,\"y\":95.20648193359375,\"width\":365.96142578125,\"height\":653.61865234375,\"top\":95.20648193359375,\"right\":377.98069763183594,\"bottom\":748.8251342773438,\"left\":12.019271850585938},\"documentWidth\":390,\"viewportWidth\":390}"
+    },
+    {
+      "name": "the white-box gallery renders every documented placeholder",
+      "ok": true,
+      "details": "36 rendered, 0 missing"
+    },
+    {
+      "name": "every white-box item has a size/orientation/triangle/GLB prompt entry",
+      "ok": true,
+      "details": "36 manifest items, 0 missing doc sections"
+    },
+    {
+      "name": "the prompt document is generated from the same manifest as the models",
+      "ok": true,
+      "details": "generated header present"
     },
     {
       "name": "Kenney CC0 licence file is present",
@@ -405,14 +491,14 @@
   "consoleErrors": [],
   "fps": {
     "frames": 301,
-    "averageMs": 16.640531561464268,
-    "p95Ms": 18.09999999962747,
-    "fpsAverage": 60.09423414789076,
-    "fpsP95": 55.248618785667496,
+    "averageMs": 16.647176079736695,
+    "p95Ms": 18.600000001490116,
+    "fpsAverage": 60.07024826374136,
+    "fpsP95": 53.76344085590786,
     "metrics": {
       "fps": 60,
-      "calls": 146,
-      "triangles": 264480,
+      "calls": 198,
+      "triangles": 104320,
       "pixelRatio": 1,
       "width": 1440,
       "height": 900,
@@ -443,7 +529,7 @@
     "phase": "victory",
     "wave": 6,
     "lives": 20,
-    "gold": 435,
+    "gold": 405,
     "star": 15,
     "towers": [
       {
@@ -549,15 +635,17 @@
     "farmland": 10,
     "stats": {
       "kills": 114,
-      "harvestedGold": 3008,
+      "harvestedGold": 2960,
       "harvestedStar": 32,
-      "planted": 202,
+      "planted": 199,
       "towersBuilt": 14,
       "leaks": 0,
-      "playSeconds": 298.6500000000535,
+      "playSeconds": 295.8166666667227,
       "reclaimed": 10,
       "merges": 0,
-      "blessings": 0
+      "blessings": 0,
+      "recruits": 0,
+      "guardsPlaced": 0
     }
   },
   "screenshots": [
@@ -565,13 +653,14 @@
     "docs/screenshots/after-victory.png",
     "docs/screenshots/after-mobile-menu.png",
     "docs/screenshots/after-mobile-game.png",
-    "docs/screenshots/after-mobile-versus.png"
+    "docs/screenshots/after-mobile-versus.png",
+    "docs/screenshots/whitebox-overview.png"
   ],
-  "finishedAt": "2026-11-16T10:54:44.430Z",
+  "finishedAt": "2026-11-16T12:22:32.885Z",
   "passed": true,
   "summary": {
-    "total": 75,
-    "passed": 75,
+    "total": 92,
+    "passed": 92,
     "failed": 0
   }
 }

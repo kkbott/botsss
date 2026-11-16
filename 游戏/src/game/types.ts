@@ -1,6 +1,14 @@
 export type CropId = 'wheat' | 'pumpkin' | 'flower';
 export type TowerId = 'arrow' | 'cannon' | 'star';
 export type EnemyId = 'fox' | 'wolf' | 'bull' | 'stag';
+/**
+ * Recruitable countryside guards. They are the 《赵云与阿斗》-style "征兵"
+ * layer: gold buys a random draft, the player chooses where each one stands,
+ * and two adjacent same-type guards merge into the next rank.
+ */
+export type GuardianId = 'bowman' | 'hoeman' | 'herbalist' | 'fieldhand' | 'mason' | 'ricespirit';
+export type GuardianRarity = 'common' | 'rare' | 'epic';
+export type GuardianAuraKind = 'farmGrowth' | 'towerDamage' | 'towerRange' | 'guardDamage';
 /** Classic is the six-wave tutorial; versus is the 1v1 roguelike season. */
 export type RunMode = 'classic' | 'versus';
 export type GamePhase =
@@ -35,8 +43,8 @@ export type WavePhase = 'prep' | 'active' | 'cleared';
 export type Quality = 'high' | 'low';
 /** First-person is the default; the old orbit camera survives as a switchable overview. */
 export type CameraMode = 'first' | 'overview';
-/** A plot is either untouched wild land, cleared farmland, or the base of a tower. */
-export type PlotState = 'wild' | 'farmland' | 'tower';
+/** A plot is untouched wild land, cleared farmland, a tower base, or a guard post. */
+export type PlotState = 'wild' | 'farmland' | 'tower' | 'guardian';
 /** What a plot becomes when its tower is dismantled. */
 export type LandState = 'wild' | 'farmland';
 
@@ -79,6 +87,46 @@ export interface TowerDef {
   modelKeys: [string, string, string];
   projectileColor: number;
   accent: number;
+}
+
+export interface GuardianLevel {
+  damage: number;
+  range: number;
+  cooldown: number;
+  splash: number;
+  slow: number;
+  slowDuration: number;
+}
+
+export interface GuardianAura {
+  kind: GuardianAuraKind;
+  /** Per-adjacent-plot multiplier bonus, e.g. 0.18 = +18%. */
+  value: number;
+  /** Player-facing description of one source. */
+  label: string;
+  icon: string;
+}
+
+export interface GuardianDef {
+  id: GuardianId;
+  name: string;
+  en: string;
+  icon: string;
+  rarity: GuardianRarity;
+  role: string;
+  description: string;
+  /** Auras only affect orthogonally adjacent plots. */
+  aura: GuardianAura | null;
+  levels: [GuardianLevel, GuardianLevel, GuardianLevel];
+  /** White-box placeholder model id, see docs/whitebox-blender-prompts.md. */
+  modelKey: string;
+  accent: number;
+  projectileColor: number;
+}
+
+export interface GuardianDraftCard {
+  uid: number;
+  id: GuardianId;
 }
 
 export interface EnemyDef {
@@ -162,6 +210,22 @@ export interface TowerRuntime {
   investedStar: number;
 }
 
+export interface GuardianRuntime {
+  id: GuardianId;
+  plot: PlotSpec;
+  level: 1 | 2 | 3;
+  cooldown: number;
+  group: import('three').Group;
+  range: number;
+  damage: number;
+  splash: number;
+  slow: number;
+  slowDuration: number;
+  fireCooldown: number;
+  /** Gold spent on the recruit batch that brought this guard in. */
+  recruitedCost: number;
+}
+
 export interface EnemyRuntime {
   id: EnemyId;
   hp: number;
@@ -240,6 +304,8 @@ export interface GameStats {
   reclaimed: number;
   merges: number;
   blessings: number;
+  recruits: number;
+  guardsPlaced: number;
 }
 
 export interface SaveData {

@@ -19,8 +19,8 @@ import {
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { CROPS, ENEMIES, TOWERS } from './config';
-import type { CropId, EnemyDef, EnemyId, TowerId } from './types';
-import type { ArtProvider, CropArt, EnemyArt, TowerArt } from './art';
+import type { CropId, EnemyDef, EnemyId, GuardianId, TowerId } from './types';
+import type { ArtProvider, CropArt, EnemyArt, GuardianArt, TowerArt } from './art';
 import { ProceduralArt } from './models';
 import { collapseGroup } from './batch';
 
@@ -477,6 +477,10 @@ export class AssetArt implements ArtProvider {
       return { group, spin, orb: placeholder };
     }
     return { group, spin, orb };
+  }
+
+  guardian(type: GuardianId, level: 1 | 2 | 3): GuardianArt {
+    return this.getFallback().guardian(type, level);
   }
 
   enemy(type: EnemyId): EnemyArt {

@@ -1,8 +1,10 @@
-import { CROPS, ENEMIES, RULES, TOWERS, WORLD } from './config';
+import { CROPS, ENEMIES, GUARDIANS, RULES, TOWERS, WORLD } from './config';
 import type {
   BlessingChoice,
   CameraMode,
   CropId,
+  GuardianDraftCard,
+  GuardianId,
   RivalState,
   RunMode,
   ShopOffer,
@@ -33,6 +35,16 @@ export interface UIActions {
   rerollShop: () => void;
   closeShop: () => void;
   retry: () => void;
+  recruit: () => void;
+  selectGuardian: (uid: number) => void;
+  dismissBench: (uid: number) => void;
+}
+
+export interface RecruitState {
+  cost: number;
+  gold: number;
+  bench: GuardianDraftCard[];
+  selected: number | null;
 }
 
 export interface InspectorData {
@@ -75,6 +87,8 @@ export interface EndData {
   maxLives: number;
   blessings: number;
   merges: number;
+  recruits: number;
+  guardsPlaced: number;
   rivalName?: string;
   rivalLives?: number;
 }
@@ -160,6 +174,10 @@ export class GameUI {
   private readonly shopLead = el('shop-lead');
   private readonly shopReroll = el<HTMLButtonElement>('btn-shop-reroll');
   private readonly shopClose = el<HTMLButtonElement>('btn-shop-close');
+  private readonly recruitBar = el('recruit-bar');
+  private readonly recruitBtn = el<HTMLButtonElement>('btn-recruit');
+  private readonly recruitBench = el('recruit-bench');
+  private readonly recruitHint = el('recruit-hint');
   private readonly crosshair = el('crosshair');
   private readonly interactPrompt = el('interact-prompt');
   private readonly interactKey = el('interact-key');
@@ -176,7 +194,8 @@ export class GameUI {
   private fpsAccum = 0;
   private fpsCount = 0;
   private lastFpsValue = 0;
-  private currentTool: { kind: 'crop' | 'tower'; id: CropId | TowerId } | null = null;
+  private currentTool: { kind: 'crop' | 'tower' | 'guardian'; id: CropId | TowerId | GuardianId } | null = null;
+  private lastRecruitKey = '';
   private lastPromptKey = '';
   private lastLockHintVisible: boolean | null = null;
   private lastTouchVisible: boolean | null = null;
@@ -208,6 +227,16 @@ export class GameUI {
     el('btn-sell').addEventListener('click', () => this.actions.sellTower());
     this.shopReroll.addEventListener('click', () => this.actions.rerollShop());
     this.shopClose.addEventListener('click', () => this.actions.closeShop());
+    this.recruitBtn.addEventListener('click', () => this.actions.recruit());
+    this.recruitBench.addEventListener('click', (event) => {
+      const dismiss = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-dismiss]');
+      if (dismiss) {
+        this.actions.dismissBench(Number(dismiss.dataset.dismiss));
+        return;
+      }
+      const card = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-guardian-uid]');
+      if (card) this.actions.selectGuardian(Number(card.dataset.guardianUid));
+    });
     this.blessingCards.addEventListener('click', (event) => {
       const target = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-blessing]');
       if (!target || target.disabled) return;
@@ -263,6 +292,7 @@ export class GameUI {
     this.menu.hidden = false;
     this.hud.hidden = true;
     this.bottomBar.hidden = true;
+    this.recruitBar.hidden = true;
     this.duelPanel.hidden = true;
     this.blessingBar.hidden = true;
     this.crosshair.hidden = true;
@@ -390,14 +420,78 @@ export class GameUI {
     this.shopScreen.hidden = true;
   }
 
+  setRecruitState(state: RecruitState) {
+    const key = JSON.stringify({
+      cost: state.cost,
+      gold: Math.floor(state.gold),
+      bench: state.bench.map((card) => `${card.uid}:${card.id}`).join('|'),
+      selected: state.selected,
+    });
+    if (key === this.lastRecruitKey) return;
+    this.lastRecruitKey = key;
+    const busy = state.bench.length > 0;
+    const afford = state.gold >= state.cost;
+    this.recruitBtn.textContent = `招募 · ${state.cost}`;
+    this.recruitBtn.disabled = busy || !afford;
+    this.recruitBtn.classList.toggle('is-unaffordable', !afford);
+    this.recruitBtn.title = busy
+      ? '待命席已满：先安置或劝返'
+      : afford
+        ? `花 ${state.cost} 金币随机招募三名乡勇 (R)`
+        : `金币不足：需要 ${state.cost} 金币`;
+    this.recruitHint.textContent = busy
+      ? '选一位乡勇，走到空地按 E 安置 · 俯瞰也可点击地块'
+      : `支付 ${state.cost} 金币，随机抽三人进入待命席`;
+    this.recruitBench.replaceChildren();
+    for (const card of state.bench) {
+      const def = GUARDIANS[card.id];
+      const slot = document.createElement('div');
+      slot.className = `recruit-slot is-${def.rarity}${state.selected === card.uid ? ' is-selected' : ''}`;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'recruit-card';
+      button.dataset.guardianUid = String(card.uid);
+      button.setAttribute('aria-pressed', state.selected === card.uid ? 'true' : 'false');
+      const icon = document.createElement('span');
+      icon.className = 'recruit-icon';
+      icon.textContent = def.icon;
+      const copy = document.createElement('span');
+      copy.className = 'recruit-copy';
+      const name = document.createElement('b');
+      name.textContent = def.name;
+      const role = document.createElement('small');
+      role.textContent = `${def.role} · ${def.aura ? def.aura.label : '自动攻击'}`;
+      copy.append(name, role);
+      const rarity = document.createElement('em');
+      rarity.className = 'recruit-rarity';
+      rarity.textContent = def.rarity === 'common' ? '常见' : def.rarity === 'rare' ? '稀有' : '史诗';
+      button.append(icon, copy, rarity);
+      const dismiss = document.createElement('button');
+      dismiss.type = 'button';
+      dismiss.className = 'recruit-dismiss';
+      dismiss.dataset.dismiss = String(card.uid);
+      dismiss.title = '劝返（不返还金币）';
+      dismiss.setAttribute('aria-label', `劝返 ${def.name}`);
+      dismiss.textContent = '×';
+      slot.append(button, dismiss);
+      this.recruitBench.appendChild(slot);
+    }
+  }
+
+  hideRecruitBar() {
+    this.recruitBar.hidden = true;
+  }
+
   showGameHud() {
     this.hud.hidden = false;
     this.bottomBar.hidden = false;
+    this.recruitBar.hidden = false;
   }
 
   hideGameHud() {
     this.hud.hidden = true;
     this.bottomBar.hidden = true;
+    this.recruitBar.hidden = true;
     this.duelPanel.hidden = true;
     this.blessingBar.hidden = true;
     this.hideIntermission();
@@ -463,10 +557,10 @@ export class GameUI {
     this.nextWaveLabel.textContent = data.mode === 'prep' ? `提前迎战 +${RULES.earlyStartBonus}` : '战斗进行中';
   }
 
-  setSelectedTool(kind: 'crop' | 'tower' | null, id?: CropId | TowerId) {
+  setSelectedTool(kind: 'crop' | 'tower' | 'guardian' | null, id?: CropId | TowerId | GuardianId) {
     this.currentTool = kind && id ? { kind, id } : null;
     for (const card of this.contextCards) {
-      const selected = !!id && (card.dataset.crop === id || card.dataset.tower === id);
+      const selected = !!id && kind !== 'guardian' && (card.dataset.crop === id || card.dataset.tower === id);
       card.classList.toggle('is-selected', selected);
       card.setAttribute('aria-pressed', selected ? 'true' : 'false');
     }
@@ -479,6 +573,9 @@ export class GameUI {
       const tower = TOWERS[id as TowerId];
       const starText = tower.starCost > 0 ? `${tower.starCost} 星辉 + ` : '';
       this.setContextHint(`${tower.name}：走到荒地或空农田旁按 E 建塔（${starText}${tower.cost} 金币）`);
+    } else if (kind === 'guardian' && id) {
+      const guardian = GUARDIANS[id as GuardianId];
+      this.setContextHint(`${guardian.name}：走到空地按 E 安置 · ${guardian.aura ? guardian.aura.label : '自动攻击'}`);
     } else {
       this.setContextHint(this.defaultHint());
     }
@@ -497,9 +594,10 @@ export class GameUI {
   defaultHint() {
     if (this.currentTool) {
       if (this.currentTool.kind === 'crop') return '走到农田旁按 E 播种；成熟后按 E 收获';
+      if (this.currentTool.kind === 'guardian') return '走到空地按 E 安置乡勇；相邻同阶乡勇可合成';
       return '走到荒地或空农田旁按 E 建塔；点击已有塔可升级';
     }
-    return 'WASD 移动 · 鼠标看 · E 开垦/播种/收获/建塔 · V 俯瞰视角';
+    return 'WASD 移动 · 鼠标看 · E 交互 · R 招募乡勇 · V 俯瞰视角';
   }
 
   setSpeedLabel(speed: number) {
@@ -664,6 +762,7 @@ export class GameUI {
   }
 
   showEnd(data: EndData) {
+    this.recruitBar.hidden = true;
     this.end.hidden = false;
     el('end-glyph').textContent = data.victory ? '🌾' : '🥀';
     const isVersus = data.mode === 'versus';
@@ -696,7 +795,7 @@ export class GameUI {
       }
     } else {
       el('end-lead').textContent = data.victory
-        ? '最后一波野兽退去，风又吹过麦浪。你用六波坚守证明了：最好的防御，是从土地里长出来的。'
+        ? '最后一波野兽退去，风又吹过稻浪。你用六波坚守证明了：最好的防御，是从土地里长出来的。'
         : '守望之种的光芒熄灭了。别灰心——下一季，先把荒地开成田，再让塔覆盖石径。';
     }
     const stats = el('end-stats');
@@ -708,6 +807,7 @@ export class GameUI {
       ['击杀野兽', String(data.kills)],
       ['种田收获', `${data.harvestedGold} 金币`],
       ['建成塔台', String(data.towersBuilt)],
+      ['招募批次 / 乡勇', `${data.recruits} / ${data.guardsPlaced}`],
     ];
     if (isVersus) {
       entries.push(['季令 / 合成', `${data.blessings} / ${data.merges}`], ['对手剩余', `${data.rivalLives ?? 0} 命`]);

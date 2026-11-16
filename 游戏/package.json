@@ -11,7 +11,10 @@
     "verify": "node scripts/verify.mjs",
     "screenshots": "node scripts/screenshots.mjs",
     "setup:browser": "playwright install chromium",
-    "screenshots:v2": "node scripts/screenshots-v2.mjs"
+    "screenshots:v2": "node scripts/screenshots-v2.mjs",
+    "docs:whitebox": "node scripts/build-whitebox-doc.mjs",
+    "screenshots:pastoral": "node scripts/screenshots-pastoral.mjs",
+    "screenshots:baseline": "node scripts/screenshots-baseline.mjs"
   },
   "dependencies": {
     "three": "0.187.0"
