@@ -160,7 +160,23 @@
       const href = text(featured.href).trim();
       const details = Array.isArray(featured.details) ? featured.details : [];
       const tags = Array.isArray(featured.tags) ? featured.tags : [];
+      const versions = Array.isArray(featured.versions)
+        ? featured.versions.filter((version) => version && text(version.href).trim())
+        : [];
       const cover = text(featured.cover || featured.heroImage).trim();
+      const playLinks = versions.length
+        ? versions
+            .map((version, index) => {
+              const versionHref = text(version.href).trim();
+              const versionLabel = text(version.label).trim() || `版本 ${index + 1}`;
+              return `<a class="btn ${index === 0 ? 'btn-solid' : 'btn-outline'}" href="${esc(versionHref)}"${targetAttrs(versionHref)} aria-label="游玩《${esc(featured.title)}》${esc(versionLabel)}">
+                ${esc(versionLabel)} <span class="arrow" aria-hidden="true">↗</span>
+              </a>`;
+            })
+            .join('')
+        : `<a class="btn btn-solid" href="${esc(href || '#')}"${targetAttrs(href)}>
+            ${esc(featured.hrefLabel || '查看作品')} <span class="arrow" aria-hidden="true">↗</span>
+          </a>`;
       featuredHost.innerHTML = `
         <article class="featured-work reveal">
           <a class="featured-visual" href="${esc(href || '#')}"${targetAttrs(href)} aria-label="打开《${esc(featured.title)}》">
@@ -193,9 +209,7 @@
                 : ''
             }
             <div class="work-actions">
-              <a class="btn btn-solid" href="${esc(href || '#')}"${targetAttrs(href)}>
-                ${esc(featured.hrefLabel || '查看作品')} <span class="arrow" aria-hidden="true">↗</span>
-              </a>
+              ${playLinks}
               ${
                 featured.source
                   ? `<a class="btn btn-ghost" href="${esc(featured.source)}" target="_blank" rel="noopener noreferrer">
